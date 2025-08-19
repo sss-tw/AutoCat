@@ -1,0 +1,27 @@
+## Interface: 11200
+## Author: 卡拉赞-亚服 
+## Title: 猫德超级一键宏 旧德二世
+## Notes: 猫德，宏辅助功能扩展
+## Title-zhCN:|CFF33AAFF[辅助]|R猫德熊德一键宏[|CFF33AAFFSuperWoW|R]
+## Notes-zhCN:猫德熊德超级一键宏 感谢 妖姬变 树先生 Crazydru
+## X-Repple: 辅助
+## Version: 2.4.0
+## Dependencies: !Libs
+## OptionalDeps: AceConsole-2.0, AceDebug-2.0, FuBarPlugin-2.0, AceLibrary, Tablet-2.0, SpellStatus-1.0, SpecialEvents-Aura-2.0
+## SavedVariablesPerCharacter: AutoCatDB
+
+Libs\ParserLib\optimizer-zhCN.lua 
+Libs\ParserLib\FixGlobalString.lua
+Libs\ParserLib\ParserLib.lua
+
+Libs\Wsd-Chat-1.0\Wsd-Chat-1.0.lua
+Libs\Wsd-Health-1.0\Wsd-Health-1.0.lua
+Libs\Wsd-Effect-1.0\Wsd-Effect-1.0.lua
+Libs\Wsd-Spell-1.0\Wsd-Spell-1.0.lua
+
+CatLib.lua
+CatEvent.lua
+CatOptions.lua
+CatHealer.lua
+CatBear.lua
+Cat.lua
