@@ -240,8 +240,17 @@ function AC.Combat.Bleed()
     
     -- 获取当前状态
     local targetHealth = UnitHealth("target")
-    local rakeDot = AC.Event.GetRakeDot()
-    local ripDot = AC.Event.GetRipDot()
+    -- 根据单猫模式选择DOT检测方法
+    local rakeDot, ripDot
+    if AC.Options.singleCatMode == 1 then
+        -- 单猫模式：使用IsBuffActive检测DOT
+        rakeDot = IsBuffActive("扫击", "target")
+        ripDot = IsBuffActive("撕扯", "target")
+    else
+        -- 非单猫模式：使用现有的检测方法
+        rakeDot = AC.Event.GetRakeDot()
+        ripDot = AC.Event.GetRipDot()
+    end
     local myPower = UnitMana("player")
     local comboPoints = GetComboPoints("target")
     local energyConserve = AC.Event.GetRestoredEnergy()
@@ -285,7 +294,6 @@ function AC.Combat.Bleed()
     -- end
     -- 补撕扯
     if not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and myPower >= 30 then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r 流血流 - 使用撕扯 (连击点:" .. comboPoints .. " 能量:" .. myPower .. ")")
         CastSpellByName("撕扯")
         AC.Combat.t1 = GetTime()
         return
@@ -325,7 +333,6 @@ function AC.Combat.Bleed()
     
     -- 补扫击
     if not rakeDot and myPower >= AC.Config.rakeEnergy then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r 流血流 - 使用扫击 (能量:" .. myPower .. ")")
         CastSpellByName("扫击")
         return
     end
@@ -452,8 +459,17 @@ function AC.Combat.RendBleed()
     
     -- 获取当前状态
     local targetHealth = UnitHealth("target")
-    local rakeDot = AC.Event.GetRakeDot()
-    local ripDot = AC.Event.GetRipDot()
+    -- 根据单猫模式选择DOT检测方法
+    local rakeDot, ripDot
+    if AC.Options.singleCatMode == 1 then
+        -- 单猫模式：使用IsBuffActive检测DOT
+        rakeDot = IsBuffActive("扫击", "target")
+        ripDot = IsBuffActive("撕扯", "target")
+    else
+        -- 非单猫模式：使用现有的检测方法
+        rakeDot = AC.Event.GetRakeDot()
+        ripDot = AC.Event.GetRipDot()
+    end
     local myPower = UnitMana("player")
     local comboPoints = GetComboPoints("target")
     local isBehind = AC.Event.CheckBehind(AC.Options.useUnitXP)
@@ -507,18 +523,12 @@ function AC.Combat.RendBleed()
     
     -- 补扫击
     if not rakeDot and myPower >= AC.Config.rakeEnergy then
-        if Cat and Cat:IsDebugging() then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r 流血撕碎流 - 使用扫击 (能量:" .. myPower .. ")")
-        end
         CastSpellByName("扫击")
         return
     end
     
     -- 补撕扯
     if not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and myPower >= 30 then
-        if Cat and Cat:IsDebugging() then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r 流血撕碎流 - 使用撕扯 (连击点:" .. comboPoints .. " 能量:" .. myPower .. ")")
-        end
         CastSpellByName("撕扯")
         AC.Combat.rendBleedT1 = GetTime()
         return

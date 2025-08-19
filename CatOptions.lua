@@ -29,6 +29,7 @@ local defaultConfig = {
                 auto_loot = true,       -- 是否启用自动拾取
                 loot_interval = 0.5,    -- 自动拾取间隔时间（秒）
                 rend_threshold = 3000,  -- 撕扯使用阈值（目标血量高于此值时使用）
+                single_cat_mode = true,     -- 单猫模式（使用IsBuffActive判断DOT）
                 avoid_player_target = true,  -- 如果目标是玩家则停止攻击并切换目标
                 ot_bear_form = true  -- OT时自动变熊
         },
@@ -130,6 +131,7 @@ AutoCat.Options = {
 	loot = 0,
 	lootInterval = 1.5,
 	rendValue = 3000,
+	singleCatMode = 1,
 	avoidPlayerTarget = 1,
 	rejuvRank = 6
 }
@@ -301,12 +303,22 @@ function Cat:OnInitialize()
 							self:ApplyConfig()
 						end
 					},
-
+					single_cat_mode = {
+						type = "toggle",
+						name = "单猫模式",
+						desc = "单猫模式：使用IsBuffActive判断DOT状态（推荐单猫使用）",
+						order = 10,
+						get = function() return self.db.profile.combat.single_cat_mode end,
+						set = function(value) 
+							self.db.profile.combat.single_cat_mode = value
+							self:ApplyConfig()
+						end
+					},
 					avoid_player_target = {
 						type = "toggle",
 						name = "避免攻击玩家",
 						desc = "如果目标是玩家则停止攻击并切换目标",
-						order = 10,
+						order = 11,
 						get = function() return self.db.profile.combat.avoid_player_target end,
 						set = function(value) 
 							self.db.profile.combat.avoid_player_target = value
@@ -317,7 +329,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "OT时变熊",
 						desc = "当OT时自动变熊形态并使用熊德攻击逻辑（不会嘲讽）",
-						order = 11,
+						order = 12,
 						get = function() return self.db.profile.combat.ot_bear_form end,
 						set = function(value) 
 							self.db.profile.combat.ot_bear_form = value
@@ -823,6 +835,7 @@ function Cat:ApplyConfig()
     AutoCat.Options.loot = self.db.profile.combat.auto_loot and 1 or 0
     AutoCat.Options.lootInterval = self.db.profile.combat.loot_interval
     AutoCat.Options.rendValue = self.db.profile.combat.rend_threshold
+    AutoCat.Options.singleCatMode = self.db.profile.combat.single_cat_mode and 1 or 0
     AutoCat.Options.avoidPlayerTarget = self.db.profile.combat.avoid_player_target and 1 or 0
     AutoCat.Options.otBearForm = self.db.profile.combat.ot_bear_form and 1 or 0
     
