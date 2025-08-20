@@ -240,17 +240,9 @@ function AC.Combat.Bleed()
     
     -- 获取当前状态
     local targetHealth = UnitHealth("target")
-    -- 根据单猫模式选择DOT检测方法
-    local rakeDot, ripDot
-    if AC.Options.singleCatMode == 1 then
-        -- 单猫模式：使用IsBuffActive检测DOT
-        rakeDot = AC.Lib.Buffed("扫击", "target")
-        ripDot = AC.Lib.Buffed("撕扯", "target")
-    else
-        -- 非单猫模式：使用现有的检测方法
-        rakeDot = AC.Event.GetRakeDot()
-        ripDot = AC.Event.GetRipDot()
-    end
+    -- 使用AutoCat的DOT检测系统
+    local rakeDot = AC.Event.GetRakeDot()
+    local ripDot = AC.Event.GetRipDot()
     local myPower = UnitMana("player")
     local comboPoints = GetComboPoints("target")
     local energyConserve = AC.Event.GetRestoredEnergy()
@@ -459,17 +451,9 @@ function AC.Combat.RendBleed()
     
     -- 获取当前状态
     local targetHealth = UnitHealth("target")
-    -- 根据单猫模式选择DOT检测方法
-    local rakeDot, ripDot
-    if AC.Options.singleCatMode == 1 then
-        -- 单猫模式：使用IsBuffActive检测DOT
-        rakeDot = IsBuffActive("扫击", "target")
-        ripDot = IsBuffActive("撕扯", "target")
-    else
-        -- 非单猫模式：使用现有的检测方法
-        rakeDot = AC.Event.GetRakeDot()
-        ripDot = AC.Event.GetRipDot()
-    end
+    -- 使用AutoCat的DOT检测系统
+    local rakeDot = AC.Event.GetRakeDot()
+    local ripDot = AC.Event.GetRipDot()
     local myPower = UnitMana("player")
     local comboPoints = GetComboPoints("target")
     local isBehind = AC.Event.CheckBehind(AC.Options.useUnitXP)
