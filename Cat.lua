@@ -244,8 +244,8 @@ function AC.Combat.Bleed()
     local rakeDot, ripDot
     if AC.Options.singleCatMode == 1 then
         -- 单猫模式：使用IsBuffActive检测DOT
-        rakeDot = IsBuffActive("扫击", "target")
-        ripDot = IsBuffActive("撕扯", "target")
+        rakeDot = AC.Lib.Buffed("扫击", "target")
+        ripDot = AC.Lib.Buffed("撕扯", "target")
     else
         -- 非单猫模式：使用现有的检测方法
         rakeDot = AC.Event.GetRakeDot()
@@ -272,75 +272,75 @@ function AC.Combat.Bleed()
         end
     end
     
-    -- 保持猛虎之怒
-    if not AC.Lib.Buff("猛虎之怒") and myPower >= 60 and AC.Options.tigerFury == 1 then
+    -- 保持猛虎之怒（积极版本）
+    if AC.Options.tigerFury == 1 and not AC.Lib.Buff("猛虎之怒") and myPower >= 30 then
         CastSpellByName("猛虎之怒")
         AC.Combat.tigerFuryTimer = GetTime()
         return
     end
 
+    -- 计算流血状态数量（用于清晰预兆判断）
+    local bleedcount = 0
+    if rakeDot then bleedcount = bleedcount + 1 end
+    if ripDot then bleedcount = bleedcount + 1 end
 
 
-    -- 变身回能逻辑优化
-    -- if dmMana >= AC.Config.shapeshiftMana and gcdLeft < 0.05 and
-    --    not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
-    --    (myPower < AC.Config.clawEnergy - 24 or (GetTime() - AC.Combat.tigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
-    --     if AC.Options.catFormMacro == 1 then
-    --         CastSpellByName("追踪人型生物")
-    --     else
-    --         CastSpellByName("猎豹形态(变形)")
-    --     end
-    --     return
-    -- end
-    -- 补撕扯
-    if not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and myPower >= 30 then
+    -- 清晰预兆触发时，在背面且三流血状态下优先撕碎
+    if hasPredatorReveal and isBehind and bleedcount < 3 and not AC.Lib.Buff("血袭") then
+        CastSpellByName("撕碎")
+        return
+    end
+
+    -- 补撕扯（5星）
+    if not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal) then
         CastSpellByName("撕扯")
         AC.Combat.t1 = GetTime()
         return
     end
-    -- 满星消耗连击点
+
+    -- 补扫击
+    if not rakeDot and (myPower >= AC.Config.rakeEnergy or hasPredatorReveal) and not AC.Lib.Buff("血袭") then
+        CastSpellByName("扫击")
+        return
+    end
+
+    -- 凶猛撕咬（满星消耗）
     if comboPoints >= 5 and myPower >= 35 then
         CastSpellByName("凶猛撕咬")
         return
     end
 
-    -- 节能施法时撕碎，否则精灵之火
-    if hasPredatorReveal then
-        if isBehind then
-            CastSpellByName("撕碎")
-        else
-            CastSpellByName("爪击")
-        end
+    -- 撕裂神像触发时撕碎
+    if isBehind and AC.Lib.Buff("撕裂神像") and (myPower >= AC.Config.tearEnergy or hasPredatorReveal) then
+        CastSpellByName("撕碎")
         return
     end
-    
 
-    if dmMana >= AC.Config.shapeshiftMana and
-        not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
-        myPower < AC.Config.clawEnergy - 20 and
-        math.mod(GetTime() - AC.Combat.tigerFuryTimer, 3) <= 1 then
+    -- 高能量撕碎策略（能量富余时）
+    if isBehind and myPower >= 75 then
+        CastSpellByName("撕碎")
+        return
+    end
+
+    -- 爪击填充空挡
+    if myPower >= AC.Config.clawEnergy or hasPredatorReveal then
+        CastSpellByName("爪击")
+        return
+    end
+
+    -- 变身回能逻辑
+    if dmMana >= AC.Config.shapeshiftMana and gcdLeft < 0.05 and
+       not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
+       (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.tigerFuryTimer and GetTime() - AC.Combat.tigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
         CastSpellByName("重整")
         return
     end
-    
-    -- 补精灵之火
+
+    -- 补精灵之火（能量不足时的填充）
     if not AC.Lib.Buff("精灵之火（野性）", "target") and 
         AC.Options.faerieFire == 1 and AC.Lib.SpellReady("精灵之火（野性）") and
-        not isStealthed then
+        not isStealthed and myPower < 30 then
         CastSpellByName("精灵之火（野性）")
-        return
-    end
-    
-    -- 补扫击
-    if not rakeDot and myPower >= AC.Config.rakeEnergy then
-        CastSpellByName("扫击")
-        return
-    end
-    
-
-    -- 在背后撕碎填充空挡
-    if myPower >= 75 and isBehind then
-        CastSpellByName("撕碎")
         return
     end
 
@@ -490,53 +490,52 @@ function AC.Combat.RendBleed()
         end
     end
     
-    -- 保持猛虎之怒
-    if not AC.Lib.Buff("猛虎之怒") and myPower >= 60 and AC.Options.tigerFury == 1 then
+    -- 保持猛虎之怒（积极版本）
+    if AC.Options.tigerFury == 1 and not AC.Lib.Buff("猛虎之怒") and myPower >= 30 then
         CastSpellByName("猛虎之怒")
         AC.Combat.rendBleedTigerFuryTimer = GetTime()
         return
     end
-    
-    -- 节能施法时撕碎，否则精灵之火
+
+    -- 计算流血状态数量（用于清晰预兆判断）
+    local bleedcount = 0
+    if rakeDot then bleedcount = bleedcount + 1 end
+    if ripDot then bleedcount = bleedcount + 1 end
+
+
+    -- 清晰预兆触发时，根据正反面选择撕碎/爪击（RendBleed模式）
     if hasPredatorReveal then
         if isBehind then
             CastSpellByName("撕碎")
+            return
         else
             CastSpellByName("爪击")
+            return
         end
-        return
     end
-    
-    -- 变身回能逻辑优化
-    if dmMana >= AC.Config.shapeshiftMana and
-        not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
-        (myPower < AC.Config.clawEnergy - 24 or (GetTime() - AC.Combat.rendBleedTigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
-        CastSpellByName("重整")
-        return
-    end
-    
-    -- 补精灵之火
-    if not AC.Lib.Buff("精灵之火（野性）", "target") and AC.Options.faerieFire == 1 and AC.Lib.SpellReady("精灵之火（野性）") then
-        CastSpellByName("精灵之火（野性）")
-        return
-    end
-    
+
     -- 补扫击
-    if not rakeDot and myPower >= AC.Config.rakeEnergy then
+    if not rakeDot and myPower >= AC.Config.rakeEnergy and not AC.Lib.Buff("血袭") then
         CastSpellByName("扫击")
         return
     end
     
     -- 补撕扯
-    if not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and myPower >= 30 then
+    if not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal) then
         CastSpellByName("撕扯")
         AC.Combat.rendBleedT1 = GetTime()
         return
     end
     
-    -- 满星消耗连击点
-    if comboPoints > 4 and myPower >= 35 then
+    -- 凶猛撕咬（满星消耗）
+    if comboPoints >= 5 and myPower >= 35 then
         CastSpellByName("凶猛撕咬")
+        return
+    end
+
+    -- 撕裂神像触发时撕碎
+    if isBehind and AC.Lib.Buff("撕裂神像") and (myPower >= AC.Config.tearEnergy or hasPredatorReveal) then
+        CastSpellByName("撕碎")
         return
     end
     
@@ -545,33 +544,31 @@ function AC.Combat.RendBleed()
         CastSpellByName("凶猛撕咬")
         return
     end
-    
-    -- 强化攻击处理
-    if AC.Lib.Buff("强化攻击") then
-        if isBehind and myPower >= AC.Config.tearEnergy then
-            CastSpellByName("撕碎")
-        else
-            CastSpellByName("爪击")
-        end
+
+    -- 高能量撕碎策略（能量富余时）
+    if isBehind and myPower >= 75 then
+        CastSpellByName("撕碎")
         return
     end
     
     -- 爪击填充空挡
-    if myPower >= AC.Config.clawEnergy then
-        if isBehind then
-            CastSpellByName("撕碎")
-        else
-            CastSpellByName("爪击")
-        end
+    if myPower >= AC.Config.clawEnergy or hasPredatorReveal then
+        CastSpellByName("爪击")
+        return
+    end
+
+    -- 变身回能逻辑
+    if dmMana >= AC.Config.shapeshiftMana and
+        not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
+        (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.rendBleedTigerFuryTimer and GetTime() - AC.Combat.rendBleedTigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
+        CastSpellByName("重整")
         return
     end
     
-    -- 能量空挡时补精灵之火
-    if myPower < AC.Config.clawEnergy and
-       myPower >= AC.Config.clawEnergy - 20 and
-       not AC.Lib.Buff("精灵之火（野性）", "target") and
-       AC.Options.faerieFire == 1 and
-       AC.Lib.SpellReady("精灵之火（野性）") then
+    -- 补精灵之火（能量不足时的填充）
+    if not AC.Lib.Buff("精灵之火（野性）", "target") and 
+        AC.Options.faerieFire == 1 and AC.Lib.SpellReady("精灵之火（野性）") and
+        myPower < 30 then
         CastSpellByName("精灵之火（野性）")
     end
 end
