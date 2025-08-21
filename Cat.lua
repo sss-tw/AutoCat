@@ -253,14 +253,17 @@ function AC.Combat.Bleed()
     local isStealthed = AC.Lib.Buff("潜行")
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
-        -- 满足凶猛撕咬或撕扯条件时使用腐败翡翠神像
-        if (comboPoints >= 5 and myPower >= 35) or
-           (comboPoints >= 3 and myPower >= 30 and GetTime() - AC.Combat.t1 > 9) or
-           (not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and myPower >= 30) then
-            UseItemByName("腐败翡翠神像")
+        -- 背对对手时装备撕裂神像，否则装备凶猛神像
+        if isBehind then
+            -- 检查是否已经装备撕裂神像
+            if not AC.Lib.CheckInventoryItemName(18, "撕裂神像") then
+                UseItemByName("撕裂神像")
+            end
         else
-            -- 不满足条件时使用凶猛神像
-            UseItemByName("凶猛神像")
+            -- 检查是否已经装备凶猛神像
+            if not AC.Lib.CheckInventoryItemName(18, "凶猛神像") then
+                UseItemByName("凶猛神像")
+            end
         end
     end
     
@@ -382,12 +385,9 @@ function AC.Combat.Backstab()
 
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
-        -- 满足凶猛撕咬条件时使用腐败翡翠神像
-        if comboPoints >= 3 and myPower < 60 and not hasPredatorReveal then
-            UseItemByName("腐败翡翠神像")
-        else
-            -- 不满足条件时使用凶猛神像
-            UseItemByName("凶猛神像")
+        -- 背刺流直接装备撕裂神像
+        if not AC.Lib.CheckInventoryItemName(18, "撕裂神像") then
+            UseItemByName("撕裂神像")
         end
     end
 
@@ -463,14 +463,9 @@ function AC.Combat.RendBleed()
     
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
-        -- 满足凶猛撕咬或撕扯条件时使用腐败翡翠神像
-        if (comboPoints >= 5 and myPower >= 35) or
-           (comboPoints >= 3 and myPower >= 30 and GetTime() - AC.Combat.rendBleedT1 > 9) or
-           (not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and myPower >= 30) then
-            UseItemByName("腐败翡翠神像")
-        else
-            -- 不满足条件时使用凶猛神像
-            UseItemByName("凶猛神像")
+        -- 流血撕碎流直接装备撕裂神像
+        if not AC.Lib.CheckInventoryItemName(18, "撕裂神像") then
+            UseItemByName("撕裂神像")
         end
     end
     
@@ -487,15 +482,10 @@ function AC.Combat.RendBleed()
     if ripDot then bleedcount = bleedcount + 1 end
 
 
-    -- 清晰预兆触发时，根据正反面选择撕碎/爪击（RendBleed模式）
-    if hasPredatorReveal then
-        if isBehind then
-            CastSpellByName("撕碎")
-            return
-        else
-            CastSpellByName("爪击")
-            return
-        end
+    -- 清晰预兆触发时，在背面且三流血状态下优先撕碎
+    if hasPredatorReveal and isBehind and bleedcount < 3 and not AC.Lib.Buff("血袭") then
+        CastSpellByName("撕碎")
+        return
     end
 
     -- 补扫击

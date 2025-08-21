@@ -477,7 +477,7 @@ SLASH_BEAR2 = "/AutoBear"
 -- 处理熊德斜杠命令
 SlashCmdList["BEAR"] = function(msg)
     if AC.Bear then
-        AC.Bear:PullAll()
+        AC.Bear:PullAll(false)
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bear Tip:|r |cFFf9cdfd熊德模块未加载！|r")
     end

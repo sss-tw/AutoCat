@@ -254,8 +254,8 @@ function Cat:OnInitialize()
 					},
 					idol_dance = {
 						type = "toggle",
-						name = "神像舞",
-						desc = "是否自动使用神像舞（自动切换神像）",
+						name = "自动装备撕裂神像",
+						desc = "是否自动装备撕裂神像",
 						order = 6,
 						get = function() return self.db.profile.combat.idol_dance end,
 						set = function(value) 
