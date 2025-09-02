@@ -391,6 +391,15 @@ local monsterList = {
     ["死灵骑士卫兵"] = true,
     ["骷髅骏马"] = true,
 
+	-- TAQ
+
+	-- MC
+    ["熔核巨人"] = true,
+    ["暗炉卫士"] = true,
+    ["暗炉织焰者"] = true,
+    ["暗炉圣职者"] = true,
+    ["法师领主索瑞森"] = true,
+	["熔核摧毁者"] = true,
 
 	-- STSM
 	["安娜丝塔丽男爵夫人"] = true,
@@ -427,8 +436,6 @@ local monsterList = {
     ["不死的居民"] = true,
     ["不死的看守者"] = true,
     ["幽灵工人"] = true,
-	["熔核巨人"] = true,
-	["熔核摧毁者"] = true,
 }
 -- 元素生物,机械中的白名单列表
 local MPmonsterWhiteList = {

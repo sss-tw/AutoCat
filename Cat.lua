@@ -215,16 +215,18 @@ AutoCat.Run = function(type)
 	-- 攻击流程
 	if type == 1 then
 		if AC.Config.targetBleed then	-- 目标可流血
-			AC.Combat.Bleed()
+			AC.Combat.Bleed(true)
 		else					-- 目标不可流血
 			AC.Combat.Backstab()
 		end
 	elseif type == 2 then
 		AC.Combat.Backstab()		-- 背刺流
 	elseif type == 3 then
-		AC.Combat.Bleed()		-- 双流血
+		AC.Combat.Bleed(true)		-- 双流血
 	elseif type == 4 then
 		AC.Combat.RendBleed()		-- 流血撕碎
+	elseif type == 5 then
+		AC.Combat.Bleed(false)		-- 流血撕碎
 	end
 end
 
@@ -233,13 +235,14 @@ end
 AC.Combat.t1 = nil
 AC.Combat.tigerFuryTimer = nil
 
-function AC.Combat.Bleed()
+function AC.Combat.Bleed(useShapeshift)
     -- 初始化计时器
     if not AC.Combat.t1 then AC.Combat.t1 = GetTime() - 12 end
     if not AC.Combat.tigerFuryTimer then AC.Combat.tigerFuryTimer = GetTime() - 18 end
     
     -- 获取当前状态
     local targetHealth = UnitHealth("target")
+    local targetMaxHealth = UnitHealthMax("target")
     -- 使用AutoCat的DOT检测系统
     local rakeDot = AC.Event.GetRakeDot()
     local ripDot = AC.Event.GetRipDot()
@@ -251,6 +254,8 @@ function AC.Combat.Bleed()
     local dmMana = AC.Lib.DriudMana()
     local gcdLeft = AC.Lib.GetSpellCooldown("愤怒")
     local isStealthed = AC.Lib.Buff("潜行")
+    -- Boss判断：世界Boss或血量大于100000
+    local isBoss = UnitClassification("target") == "worldboss" or (targetMaxHealth and targetMaxHealth > 100000)
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
         -- 背对对手时装备撕裂神像，否则装备凶猛神像
@@ -293,6 +298,13 @@ function AC.Combat.Bleed()
         return
     end
 
+    -- 非Boss目标1星撕扯
+    if not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal) then
+        CastSpellByName("撕扯")
+        AC.Combat.t1 = GetTime()
+        return
+    end
+
     -- 补扫击
     if not rakeDot and (myPower >= AC.Config.rakeEnergy or hasPredatorReveal) and not AC.Lib.Buff("血袭") then
         CastSpellByName("扫击")
@@ -327,7 +339,9 @@ function AC.Combat.Bleed()
     if dmMana >= AC.Config.shapeshiftMana and gcdLeft < 0.05 and
        not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
        (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.tigerFuryTimer and GetTime() - AC.Combat.tigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
-        CastSpellByName("重整")
+        if useShapeshift then
+            CastSpellByName("重整")
+        end
         return
     end
 
