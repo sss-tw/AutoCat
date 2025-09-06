@@ -380,12 +380,14 @@ function Bear:PullAll(noTaunt)
 		Spell:AutoAttack()
 	end
 	
-	-- 使用共通饰品设置（使用缓存的可用性检查结果）
-	if GetInventoryItemCooldown("player", 13) == 0 and AC.Options.trinketUpper == 1 and AC.TrinketUsable.upper then
-		UseInventoryItem(13)
-	end
-	if GetInventoryItemCooldown("player", 14) == 0 and AC.Options.trinketBelow == 1 and AC.TrinketUsable.below then
-		UseInventoryItem(14)
+	-- 使用共通饰品设置（使用缓存的可用性检查结果，需要有目标且在近战范围）
+	if UnitExists("target") and not UnitIsDead("target") and CheckInteractDistance("target", 3) then
+		if GetInventoryItemCooldown("player", 13) == 0 and AC.Options.trinketUpper == 1 and AC.TrinketUsable.upper then
+			UseInventoryItem(13)
+		end
+		if GetInventoryItemCooldown("player", 14) == 0 and AC.Options.trinketBelow == 1 and AC.TrinketUsable.below then
+			UseInventoryItem(14)
+		end
 	end
 
 	-- 精灵之火（野性）

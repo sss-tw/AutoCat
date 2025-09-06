@@ -24,4 +24,5 @@ CatEvent.lua
 CatOptions.lua
 CatHealer.lua
 CatBear.lua
+CatBird.lua
 Cat.lua

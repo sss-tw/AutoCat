@@ -334,7 +334,14 @@ function AC.Lib.DriudRefreshInfo()
 
 	-- 同时检查饰品可用性
 	if AC.CheckTrinketUsability then
+		if Cat and Cat:IsDebugging() then
+			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 从 CatLib 调用 CheckTrinketUsability")
+		end
 		AC.CheckTrinketUsability()
+	else
+		if Cat and Cat:IsDebugging() then
+			DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000Trinket Error:|r CheckTrinketUsability 函数不存在!")
+		end
 	end
 
 	return rage

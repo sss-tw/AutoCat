@@ -29,8 +29,9 @@
 -- 1. 游戏中输入 /cat 打开设置界面
 -- 2. 或者创建宏，在宏里填入"/script AutoCat()"，不包含引号
 -- 无参数强制打法类型，则通过配置来决定
--- 一键宏的技能模式，取值范围(1,2,3,4)，1=自动选择，2=仅进行背刺流打法，3=仅进行双流血打法，4=流血撕碎打法
+-- 一键宏的技能模式，取值范围(1,2,3,4,5)，1=自动选择，2=仅进行背刺流打法，3=仅进行双流血打法，4=流血撕碎打法，5=流血撕碎(无变身)
 -- 例如："/script AutoCat(2)"，只打背刺流
+-- 鸟德攻击请使用："/script AutoBird()" 或 "/autobird"
 -- -------------------------------------
 
 -- 确保AutoCat对象已创建
@@ -47,11 +48,11 @@ local lastLootTime = 0  -- 上次拾取时间
 AutoCat.Run = function(type)
 
 	-- 无参数强制打法类型，则通过配置来决定
-	-- 一键宏的技能模式，取值范围(1,2,3,4)
+	-- 一键宏的技能模式，取值范围(1,2,3,4,5)
 	if not type then
 		type = AC.Options.type
 	else
-		if type < 1 or type > 4 then
+		if type < 1 or type > 5 then
 			type = AC.Options.type
 		end
 	end
@@ -66,56 +67,28 @@ AutoCat.Run = function(type)
 	local isBehind = AC.Event.CheckBehind(AC.Options.useUnitXP)
 	local combat = UnitAffectingCombat("player")
 
-	-- OT处理：当成为怪物攻击目标时的应对策略（在变身前处理）
+	-- OT处理：当成为怪物攻击目标时的应对策略（简化版）
 	if combat and UnitExists("target") and UnitExists("targettarget") and UnitIsUnit("player", "targettarget") then
 		local targetMaxHealth = UnitHealthMax("target")
 		if targetMaxHealth > 100000 then
             local hasLimitedInvulBuff = AC.Lib.Buff("无敌")
             if hasLimitedInvulBuff then
-                -- 成功使用有限无敌，继续猫德攻击
+                -- 已有无敌buff，继续猫德攻击
                 if Cat and Cat:IsDebugging() then
-                    DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r OT检测到，成功使用有限无敌药水")
+                    DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r OT检测到，已有无敌buff，继续猫德攻击")
                 end
             else
-                local useBeaForm = false
-                -- 检查有限无敌药水状态
+                -- 没有无敌buff时的处理
                 if AC.Options.otLimitedInvulnerability == 1 then
-                    -- 检查有限无敌药水是否在CD中
-                    local potionOnCooldown = false
-                    
-                    -- 遍历背包查找有限无敌药水并检查CD
-                    for bag = 0, 4 do
-                        for slot = 1, GetContainerNumSlots(bag) do
-                            local itemLink = GetContainerItemLink(bag, slot)
-                            if itemLink then
-                                local itemName = GetItemInfo(itemLink)
-                                if itemName and (itemName == "有限无敌药水" or itemName == "Limited Invulnerability Potion") then
-                                    local startTime, duration = GetContainerItemCooldown(bag, slot)
-                                    if duration > 0 then
-                                        potionOnCooldown = true
-                                    end
-                                    break
-                                end
-                            end
-                        end
-                        if potionOnCooldown then break end
+                    -- 直接使用有限无敌药水，不检查CD
+                    AC.Lib.UseItemByName("有限无敌药水")
+                    if Cat and Cat:IsDebugging() then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r OT检测到，使用有限无敌药水")
                     end
-                    
-                    -- 如果药水不在CD中，尝试使用
-                    if not potionOnCooldown then
-                        AC.Lib.UseItemByName("有限无敌药水")
-                    else
-                        useBeaForm = true
-                        if Cat and Cat:IsDebugging() then
-                            DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r 有限无敌药水CD中，需要使用熊形态应对")
-                        end
-                    end
-                else
-                    useBeaForm = true
                 end
                 
                 -- OT变熊处理
-                if AC.Options.otBearForm == 1 and useBeaForm then
+                if AC.Options.otBearForm == 1 then
                     if Cat and Cat:IsDebugging() then
                         DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r OT检测到，使用熊形态应对")
                     end
@@ -192,12 +165,14 @@ AutoCat.Run = function(type)
 	-- 开启自动攻击
 	AC.Lib.StartAttack()
 
-	-- 自动开启饰品（使用缓存的可用性检查结果）
-	if GetInventoryItemCooldown("player",13)==0 and AC.Options.trinketUpper==1 and AC.TrinketUsable.upper then
-		UseInventoryItem(13)
-	end
-	if GetInventoryItemCooldown("player",14)==0 and AC.Options.trinketBelow==1 and AC.TrinketUsable.below then
-		UseInventoryItem(14)
+	-- 自动开启饰品（使用缓存的可用性检查结果，需要有目标且在近战范围）
+	if UnitExists("target") and not UnitIsDead("target") and CheckInteractDistance("target", 3) then
+		if GetInventoryItemCooldown("player",13)==0 and AC.Options.trinketUpper==1 and AC.TrinketUsable.upper then
+			UseInventoryItem(13)
+		end
+		if GetInventoryItemCooldown("player",14)==0 and AC.Options.trinketBelow==1 and AC.TrinketUsable.below then
+			UseInventoryItem(14)
+		end
 	end
 
 	-- 血量危险时处理，潜行下不吃药

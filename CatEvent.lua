@@ -125,8 +125,14 @@ AC.Event.rakeCheck = {} -- 扫击检查
 AC.Event.rakeDelayTime = {} -- 扫击延迟时间
 AC.Event.ripCheck = {} -- 撕扯检查
 AC.Event.ripDelayTime = {} -- 撕扯延迟时间
+AC.Event.moonfireCheck = {} -- 月火术检查
+AC.Event.moonfireDelayTime = {} -- 月火术延迟时间
+AC.Event.swarmCheck = {} -- 虫群检查
+AC.Event.swarmDelayTime = {} -- 虫群延迟时间
 AC.Event.lastRakeTime = 0 -- 上次扫击时间
 AC.Event.lastRipTime = 0 -- 上次撕扯时间
+AC.Event.lastMoonfireTime = 0 -- 上次月火术时间
+AC.Event.lastSwarmTime = 0 -- 上次虫群时间
 AC.Event.bleenCheckDelay = 0.3 -- 流血检查延迟
 AC.Event.dotDurationDelay = 0.08 -- 新增：网络延迟补偿
 
@@ -678,6 +684,126 @@ function AC.Event.UnregisterAllEvents()
     if frame then
         frame:UnregisterAllEvents()
     end
+end
+
+-- 获取当前目标是否有月火术效果（鸟德用）
+-- 注：优先使用Cursive插件，其次SuperWow支持更加准确
+function AC.Event.GetMoonfireDot()
+    -- 优先检测是否有Cursive插件（需要SuperWow支持获取GUID）
+    if Cursive and Cursive.curses and AC.Event.superWowEnabled then
+        local a, guid = UnitExists("target")
+        if guid then
+            return Cursive.curses:HasCurse("月火术", guid)
+        end
+    end
+
+    -- 检测是否有SuperWow模组
+    if not AC.Event.superWowEnabled then
+        local hasMoonfireBuff = AC.Lib.Buff("月火术", "target")
+        -- 如果没有月火术buff且上次月火术超过18秒，返回false强制补月火术
+        if not hasMoonfireBuff and AC.Event.lastMoonfireTime and (GetTime() - AC.Event.lastMoonfireTime) > 18 then
+            return false
+        end
+        return hasMoonfireBuff
+    end
+
+    -- 获取目标GUID，并确保其存在
+    local a, guid = UnitExists("target")
+    if not guid then
+        return false
+    end
+
+    -- 0.3秒监测期里
+    if AC.Event.moonfireDelayTime[guid] then
+        local timer = GetTime() - AC.Event.moonfireDelayTime[guid]
+        if timer <= AC.Event.bleenCheckDelay then
+            -- 还在等待认证期
+            return AC.Event.GetMoonfireDotCheck(guid)
+        else
+            -- 已经过了认证期
+            AC.Event.moonfireCheck[guid] = AC.Event.moonfireDelayTime[guid]
+        end
+    end
+
+    local hasMoonfire = AC.Event.GetMoonfireDotCheck(guid)
+    
+    -- 兜底逻辑：如果SuperWow检测不到月火术且上次月火术超过18秒，强制返回false
+    if not hasMoonfire and AC.Event.lastMoonfireTime and (GetTime() - AC.Event.lastMoonfireTime) > 18 then
+        return false
+    end
+    
+    return hasMoonfire
+end
+
+function AC.Event.GetMoonfireDotCheck(guid)
+    if AC.Event.moonfireCheck and AC.Event.moonfireCheck[guid] then
+        local timer = GetTime() - AC.Event.moonfireCheck[guid]
+        if timer < (18 - AC.Event.dotDurationDelay) then -- 月火术持续18秒
+            return true
+        end
+    end
+
+    return false
+end
+
+-- 获取当前目标是否有虫群效果（鸟德用）
+-- 注：优先使用Cursive插件，其次SuperWow支持更加准确
+function AC.Event.GetSwarmDot()
+    -- 优先检测是否有Cursive插件（需要SuperWow支持获取GUID）
+    if Cursive and Cursive.curses and AC.Event.superWowEnabled then
+        local a, guid = UnitExists("target")
+        if guid then
+            return Cursive.curses:HasCurse("虫群", guid)
+        end
+    end
+
+    -- 检测是否有SuperWow模组
+    if not AC.Event.superWowEnabled then
+        local hasSwarmBuff = AC.Lib.Buff("虫群", "target")
+        -- 如果没有虫群buff且上次虫群超过18秒，返回false强制补虫群
+        if not hasSwarmBuff and AC.Event.lastSwarmTime and (GetTime() - AC.Event.lastSwarmTime) > 18 then
+            return false
+        end
+        return hasSwarmBuff
+    end
+
+    -- 获取目标GUID，并确保其存在
+    local a, guid = UnitExists("target")
+    if not guid then
+        return false
+    end
+
+    -- 0.3秒监测期里
+    if AC.Event.swarmDelayTime[guid] then
+        local timer = GetTime() - AC.Event.swarmDelayTime[guid]
+        if timer <= AC.Event.bleenCheckDelay then
+            -- 还在等待认证期
+            return AC.Event.GetSwarmDotCheck(guid)
+        else
+            -- 已经过了认证期
+            AC.Event.swarmCheck[guid] = AC.Event.swarmDelayTime[guid]
+        end
+    end
+
+    local hasSwarm = AC.Event.GetSwarmDotCheck(guid)
+    
+    -- 兜底逻辑：如果SuperWow检测不到虫群且上次虫群超过18秒，强制返回false
+    if not hasSwarm and AC.Event.lastSwarmTime and (GetTime() - AC.Event.lastSwarmTime) > 18 then
+        return false
+    end
+    
+    return hasSwarm
+end
+
+function AC.Event.GetSwarmDotCheck(guid)
+    if AC.Event.swarmCheck and AC.Event.swarmCheck[guid] then
+        local timer = GetTime() - AC.Event.swarmCheck[guid]
+        if timer < (18 - AC.Event.dotDurationDelay) then -- 虫群持续18秒
+            return true
+        end
+    end
+
+    return false
 end
 
 -- 设置事件处理函数

@@ -99,6 +99,15 @@ local defaultConfig = {
 				["狂暴"] = true,
 				["树皮术（野性）"] = true,
 			}
+		},
+		-- 鸟德设置（新增）
+		bird = {
+			-- 战斗设置
+			combat = {
+				autoActivate = true,         -- 自动使用激活
+				otInvulnerability = true,    -- OT吃有限无敌
+				executeThreshold = 19,       -- 斩杀阈值（百分比）
+			}
 		}
 }
 
@@ -196,8 +205,10 @@ function Cat:OnInitialize()
 								self.db.profile.combat["type"] = 2
 							elseif value == "bleed" then
 								self.db.profile.combat["type"] = 3
-							else
+							elseif value == "rend" then
 								self.db.profile.combat["type"] = 4
+							else
+								self.db.profile.combat["type"] = 1
 							end
 							self:ApplyConfig()
 						end,
@@ -327,11 +338,61 @@ function Cat:OnInitialize()
 					}
 				}
 			},
+			bird = {
+				type = "group",
+				name = "鸟德",
+				desc = "设置鸟德战斗相关选项",
+				order = 2,
+				args = {
+					-- 战斗设置
+					combat_header = {
+						type = "header",
+						name = "战斗设置",
+						order = 1,
+					},
+					auto_activate = {
+						type = "toggle",
+						name = "自动使用激活",
+						desc = "无蓝时自动使用激活技能",
+						order = 2,
+						get = function() return self.db.profile.bird.combat.autoActivate end,
+						set = function(value) 
+							self.db.profile.bird.combat.autoActivate = value
+							self:ApplyConfig()
+						end
+					},
+					ot_invulnerability = {
+						type = "toggle",
+						name = "OT吃有限无敌",
+						desc = "当成为Boss攻击目标时自动使用有限无敌药水",
+						order = 3,
+						get = function() return self.db.profile.bird.combat.otInvulnerability end,
+						set = function(value) 
+							self.db.profile.bird.combat.otInvulnerability = value
+							self:ApplyConfig()
+						end
+					},
+					execute_threshold = {
+						type = "range",
+						name = "斩杀阈值",
+						desc = "目标血量低于该百分比时优先使用愤怒进行斩杀",
+						order = 4,
+						min = 0,
+						max = 100,
+						step = 1,
+						get = function() return self.db.profile.bird.combat.executeThreshold end,
+						set = function(value) 
+							self.db.profile.bird.combat.executeThreshold = value
+							self:ApplyConfig()
+						end
+					}
+				}
+			},
 			bear = {
 				type = "group",
 				name = "熊德",
 				desc = "设置熊德战斗相关选项",
-				order = 2,
+				order = 3,
 				args = {
 					-- 槌击设置
 					maul_header = {
@@ -633,7 +694,7 @@ function Cat:OnInitialize()
 				type = "group",
 				name = "治疗",
 				desc = "设置治疗相关选项",
-				order = 3,
+				order = 4,
 				args = {
 					rejuv_rank = {
 						type = "range",
@@ -655,7 +716,7 @@ function Cat:OnInitialize()
 				type = "group",
 				name = "共通",
 				desc = "设置饰品、消耗品、调试等共通选项",
-				order = 4,
+				order = 5,
 				args = {
 					trinket_header = {
 						type = "header",
@@ -809,6 +870,11 @@ function Cat:OnInitialize()
 	if AutoCat.Bear then
 		AutoCat.Bear:Initialize()
 	end
+	
+	-- 初始化鸟德模块（如果存在）
+	if AutoCat.Bird then
+		AutoCat.Bird:Initialize()
+	end
 end
 
 -- 应用配置仅到AutoCat.Options（保持原版结构）
@@ -871,6 +937,15 @@ function Cat:ApplyConfig()
             growl = self.db.profile.bear.timing.growl
         },
         report = self.db.profile.bear.report
+    }
+    
+    -- 鸟德设置 - 融合到AutoCat.Options
+    AutoCat.Options.bird = {
+        combat = {
+            autoActivate = self.db.profile.bird.combat.autoActivate,
+            otInvulnerability = self.db.profile.bird.combat.otInvulnerability,
+            executeThreshold = self.db.profile.bird.combat.executeThreshold
+        }
     }
 end
 
