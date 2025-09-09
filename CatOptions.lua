@@ -100,15 +100,20 @@ local defaultConfig = {
 				["树皮术（野性）"] = true,
 			}
 		},
-		-- 鸟德设置（新增）
-		bird = {
-			-- 战斗设置
-			combat = {
-				autoActivate = true,         -- 自动使用激活
-				otInvulnerability = true,    -- OT吃有限无敌
-				executeThreshold = 19,       -- 斩杀阈值（百分比）
-			}
+	-- 鸟德设置（新增）
+	bird = {
+		-- 战斗设置
+		combat = {
+			autoActivate = true,         -- 自动使用激活
+			otInvulnerability = true,    -- OT吃有限无敌
+			executeThreshold = 19,       -- 斩杀阈值（百分比）
+		},
+		-- Eclipse等待时间设置
+		eclipse = {
+			solarWait = 15,    -- 日蚀结束后等待秒数
+			lunarWait = 12     -- 月蚀结束后等待秒数
 		}
+	}
 }
 
 -- 确保AutoCat对象存在
@@ -344,17 +349,11 @@ function Cat:OnInitialize()
 				desc = "设置鸟德战斗相关选项",
 				order = 2,
 				args = {
-					-- 战斗设置
-					combat_header = {
-						type = "header",
-						name = "战斗设置",
-						order = 1,
-					},
 					auto_activate = {
 						type = "toggle",
 						name = "自动使用激活",
 						desc = "无蓝时自动使用激活技能",
-						order = 2,
+						order = 1,
 						get = function() return self.db.profile.bird.combat.autoActivate end,
 						set = function(value) 
 							self.db.profile.bird.combat.autoActivate = value
@@ -365,7 +364,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "OT吃有限无敌",
 						desc = "当成为Boss攻击目标时自动使用有限无敌药水",
-						order = 3,
+						order = 2,
 						get = function() return self.db.profile.bird.combat.otInvulnerability end,
 						set = function(value) 
 							self.db.profile.bird.combat.otInvulnerability = value
@@ -376,13 +375,41 @@ function Cat:OnInitialize()
 						type = "range",
 						name = "斩杀阈值",
 						desc = "目标血量低于该百分比时优先使用愤怒进行斩杀",
-						order = 4,
+						order = 3,
 						min = 0,
 						max = 100,
 						step = 1,
 						get = function() return self.db.profile.bird.combat.executeThreshold end,
 						set = function(value) 
 							self.db.profile.bird.combat.executeThreshold = value
+							self:ApplyConfig()
+						end
+					},
+					solarWait = {
+						type = "range",
+						name = "日蚀等待时间",
+						desc = "日蚀结束后等待多少秒才重新触发Eclipse循环",
+						order = 4,
+						min = 0,
+						max = 60,
+						step = 1,
+						get = function() return self.db.profile.bird.eclipse.solarWait end,
+						set = function(value) 
+							self.db.profile.bird.eclipse.solarWait = value
+							self:ApplyConfig()
+						end
+					},
+					lunarWait = {
+						type = "range",
+						name = "月蚀等待时间",
+						desc = "月蚀结束后等待多少秒才重新触发Eclipse循环",
+						order = 5,
+						min = 0,
+						max = 60,
+						step = 1,
+						get = function() return self.db.profile.bird.eclipse.lunarWait end,
+						set = function(value) 
+							self.db.profile.bird.eclipse.lunarWait = value
 							self:ApplyConfig()
 						end
 					}
@@ -945,8 +972,17 @@ function Cat:ApplyConfig()
             autoActivate = self.db.profile.bird.combat.autoActivate,
             otInvulnerability = self.db.profile.bird.combat.otInvulnerability,
             executeThreshold = self.db.profile.bird.combat.executeThreshold
+        },
+        eclipse = {
+            solarWait = self.db.profile.bird.eclipse.solarWait,
+            lunarWait = self.db.profile.bird.eclipse.lunarWait
         }
     }
+    
+    -- 同步Eclipse配置到鸟德模块
+    if AutoCat.Bird and AutoCat.Bird.Options then
+        AutoCat.Bird.Options.eclipse = AutoCat.Options.bird.eclipse
+    end
 end
 
 function Cat:OnEnable()

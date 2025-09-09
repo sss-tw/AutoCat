@@ -30,7 +30,20 @@ Bird.Options = {
 		autoActivate = true,     -- 自动使用激活
 		otInvulnerability = true,  -- OT吃有限无敌
 		executeThreshold = 19,   -- 斩杀阈值（百分比）
+	},
+	-- Eclipse等待时间设置
+	eclipse = {
+		solarWait = 15,    -- 日蚀结束后等待秒数
+		lunarWait = 12     -- 月蚀结束后等待秒数
 	}
+}
+
+-- Eclipse状态管理
+Bird.Eclipse = {
+	-- 当前状态："日蚀"、"月蚀" 或 ""
+	state = "",
+	-- 等待结束时间 (0表示无等待)
+	waitEndTime = 0,
 }
 
 
@@ -54,6 +67,90 @@ function Bird:DebugPrint(message, ...)
 	-- 使用Cat的调试系统
 	if Cat and Cat:IsDebugging() then
 		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird Debug:|r " .. formattedMessage)
+	end
+end
+
+-- Eclipse状态管理方法
+function Bird:OnEclipseGained(eclipseName)
+	self:DebugPrint("获得Eclipse：%s", eclipseName)
+	
+	-- 更新状态
+	self.Eclipse.state = eclipseName
+	self.Eclipse.waitEndTime = 0
+	
+	-- 如果有等待期，重置它
+	if self.waitTimeoutId then
+		self.waitTimeoutId = nil
+	end
+end
+
+function Bird:OnEclipseLost(eclipseName)
+	self:DebugPrint("失去Eclipse：%s", eclipseName)
+	
+	-- 获取等待时间
+	local waitTime = 0
+	if eclipseName == "日蚀" then
+		waitTime = self.Options.eclipse.solarWait
+	elseif eclipseName == "月蚀" then
+		waitTime = self.Options.eclipse.lunarWait
+	end
+	
+	if waitTime > 0 then
+		-- 设置等待结束时间
+		self.Eclipse.waitEndTime = GetTime() + waitTime
+		self:DebugPrint("Eclipse等待%d秒，等待结束时间：%.1f", waitTime, self.Eclipse.waitEndTime)
+		
+		-- 设置定时器来清理状态（使用简单的时间跟踪）
+		self.waitTimeoutId = true
+	else
+		-- 立即清理状态
+		self:OnEclipseWaitTimeout()
+	end
+end
+
+function Bird:OnEclipseWaitTimeout()
+	self:DebugPrint("Eclipse等待超时，重置状态")
+	self.Eclipse.state = ""
+	self.Eclipse.waitEndTime = 0
+	self.waitTimeoutId = nil
+end
+
+-- 检查当前Eclipse状态
+function Bird:GetEclipseState()
+	-- 首先检查是否还在等待期
+	if self.Eclipse.waitEndTime > 0 and GetTime() >= self.Eclipse.waitEndTime then
+		-- 等待期已结束，清理状态
+		self:OnEclipseWaitTimeout()
+	end
+	
+	-- 返回当前状态和是否在等待期
+	local isWaiting = self.Eclipse.waitEndTime > 0 and GetTime() < self.Eclipse.waitEndTime
+	return self.Eclipse.state, isWaiting
+end
+
+-- 检查Eclipse buff状态变化（由UNIT_AURA事件触发）
+function Bird:CheckEclipseBuffs()
+	-- 检查当前的Eclipse buff状态
+	local hasSolarEclipse = AC.Lib.Buff("日蚀")
+	local hasLunarEclipse = AC.Lib.Buff("月蚀")
+	
+	-- 确定当前应该有的状态
+	local currentBuffState = ""
+	if hasSolarEclipse then
+		currentBuffState = "日蚀"
+	elseif hasLunarEclipse then
+		currentBuffState = "月蚀"
+	end
+	
+	-- 检查状态变化
+	if currentBuffState ~= self.Eclipse.state then
+		if currentBuffState ~= "" then
+			-- 获得了新的Eclipse buff
+			self:OnEclipseGained(currentBuffState)
+		elseif self.Eclipse.state ~= "" then
+			-- 失去了Eclipse buff
+			self:OnEclipseLost(self.Eclipse.state)
+		end
 	end
 end
 
@@ -240,7 +337,7 @@ function Bird:IsInMoonkinForm()
 	return false
 end
 
--- 鸟德战斗流程（基于平衡德宏逻辑）
+-- 鸟德战斗流程（基于平衡德宏逻辑，集成Eclipse状态管理）
 function Bird:BirdCombatFlow()
 	local mana = UnitMana("player")
 	local targetHealth = UnitHealth("target")
@@ -255,9 +352,11 @@ function Bird:BirdCombatFlow()
 		return
 	end
 	
-	self:DebugPrint("鸟德攻击流程：法力%d，目标血量%.1f%%", mana, targetHealthPercent)
+	-- 获取Eclipse状态信息
+	local eclipseState, isEclipseWaiting = self:GetEclipseState()
 	
-	-- 获取状态信息（使用现有函数）
+	self:DebugPrint("鸟德攻击流程：法力%d，目标血量%.1f%%，Eclipse状态：%s，等待中：%s", 
+		mana, targetHealthPercent, eclipseState or "无", tostring(isEclipseWaiting))
 	
 	-- 检查目标DOT状态（使用与猫德相同的检测方式）
 	local swarm = AC.Event.GetSwarmDot()
@@ -265,8 +364,6 @@ function Bird:BirdCombatFlow()
 	
 	-- 检查自身BUFF状态
 	local hasStarshift = AC.Lib.Buff("斗转星移")
-	local hasEclipseSun = AC.Lib.Buff("日蚀")
-	local hasEclipseMoon = AC.Lib.Buff("月蚀")
 	local hasNatureBlessing = AC.Lib.Buff("自然之赐")
 	local hasBalance = AC.Lib.Buff("万物平衡")
 	local hasDayfall = AC.Lib.Buff("昼至")
@@ -276,7 +373,7 @@ function Bird:BirdCombatFlow()
 	
 	-- 斗转星移状态下的优先级
 	if hasStarshift then
-		if hasEclipseMoon then
+		if eclipseState == "月蚀" then
 			CastSpellByName("星火术")
 			self:DebugPrint("斗转星移+月蚀：星火术")
 		else
@@ -288,8 +385,14 @@ function Bird:BirdCombatFlow()
 	
 	-- 斩杀阶段优先级最高
 	if targetHealthPercent > 0 and targetHealthPercent <= AC.Options.bird.combat.executeThreshold then
-		CastSpellByName("愤怒")
-		self:DebugPrint("斩杀阶段：使用愤怒")
+		if hasBalance then
+			-- 有万物平衡时优选星火术（避免弹道时间）
+			CastSpellByName("星火术")
+			self:DebugPrint("斩杀阶段+万物平衡：星火术")
+		else
+			CastSpellByName("愤怒")
+			self:DebugPrint("斩杀阶段：愤怒")
+		end
 		return
 	end
 	
@@ -302,8 +405,8 @@ function Bird:BirdCombatFlow()
 		end
 	end
 	
-	-- 常规输出循环（参考DruidBird优化）
-	if hasEclipseSun then
+	-- Eclipse状态输出循环（使用精确的状态管理）
+	if eclipseState == "日蚀" and not isEclipseWaiting then
 		-- 日蚀状态：自然伤害增强25%
 		if not swarm then
 			-- 日蚀时优先虫群（自然伤害DOT）
@@ -328,7 +431,7 @@ function Bird:BirdCombatFlow()
 			self:DebugPrint("日蚀：愤怒")
 			return
 		end
-	elseif hasEclipseMoon then
+	elseif eclipseState == "月蚀" and not isEclipseWaiting then
 		-- 月蚀状态：奥术伤害增强25%
 		if not moonfire then
 			-- 月蚀时优先月火术（奥术伤害DOT）
@@ -351,6 +454,24 @@ function Bird:BirdCombatFlow()
 			-- 月蚀时主要输出：星火术（奥术伤害）
 			CastSpellByName("星火术")
 			self:DebugPrint("月蚀：星火术")
+			return
+		end
+	elseif isEclipseWaiting then
+		-- Eclipse等待期：维持基本循环，避免浪费Eclipse
+		if not swarm then
+			CastSpellByName("虫群")
+			AC.Event.lastSwarmTime = GetTime()
+			self:DebugPrint("Eclipse等待期：维持虫群")
+			return
+		elseif not moonfire then
+			CastSpellByName("月火术")
+			AC.Event.lastMoonfireTime = GetTime()
+			self:DebugPrint("Eclipse等待期：维持月火术")
+			return
+		else
+			-- 等待期保守输出，优选愤怒
+			CastSpellByName("愤怒")
+			self:DebugPrint("Eclipse等待期：愤怒")
 			return
 		end
 	else
@@ -418,5 +539,41 @@ SlashCmdList["AUTOCATBIRD"] = function(msg)
     AutoBird()
 end
 
+-- 注册测试Eclipse状态的斜杠命令
+SLASH_BIRDECLIPSE1 = "/birdeclipse"
+SLASH_BIRDECLIPSE2 = "/be"
+
+SlashCmdList["BIRDECLIPSE"] = function(msg)
+    if not AC.Bird then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird:|r 鸟德模块未加载")
+        return
+    end
+    
+    local eclipseState, isWaiting = AC.Bird:GetEclipseState()
+    local waitTimeLeft = ""
+    if isWaiting and AC.Bird.Eclipse.waitEndTime > 0 then
+        waitTimeLeft = string.format("，剩余%.1f秒", AC.Bird.Eclipse.waitEndTime - GetTime())
+    end
+    
+    DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Bird Eclipse:|r 状态：%s，等待中：%s%s", 
+        eclipseState or "无", tostring(isWaiting), waitTimeLeft))
+    
+    -- 测试命令：模拟Eclipse获得/失去
+    if msg == "solar" then
+        AC.Bird:OnEclipseGained("日蚀")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird Test:|r 模拟获得日蚀")
+    elseif msg == "lunar" then
+        AC.Bird:OnEclipseGained("月蚀")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird Test:|r 模拟获得月蚀")
+    elseif msg == "losesolar" then
+        AC.Bird:OnEclipseLost("日蚀")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird Test:|r 模拟失去日蚀")
+    elseif msg == "loselunar" then
+        AC.Bird:OnEclipseLost("月蚀")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird Test:|r 模拟失去月蚀")
+    end
+end
+
 -- 调试输出确认函数注册
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r AutoBird函数和命令已注册")
+DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r Eclipse测试命令：/birdeclipse 或 /be")

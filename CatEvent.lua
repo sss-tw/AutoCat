@@ -151,6 +151,9 @@ frame:RegisterEvent("SPELLCAST_FAILED")
 frame:RegisterEvent("SPELLCAST_INTERRUPTED")
 frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 
+-- 鸟德Eclipse状态跟踪相关事件
+frame:RegisterEvent("UNIT_AURA")
+
 -- 熊德相关事件
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -280,7 +283,12 @@ function AC.EventHandlers.OnEvent()
         if AC.Healer and AC.Healer.OnSpellcastSucceeded then
             AC.Healer.OnSpellcastSucceeded(arg1, arg2, arg3, arg4, arg5)
         end
-
+    
+    -- 鸟德Eclipse状态跟踪
+    elseif event == "UNIT_AURA" then
+        if arg1 == "player" and AC.Bird and AC.Bird.CheckEclipseBuffs then
+            AC.Bird:CheckEclipseBuffs()
+        end
 
     -- 回能量事件处理
     elseif event == "UNIT_ENERGY" and arg1 == "player" then
