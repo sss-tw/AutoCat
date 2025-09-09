@@ -166,7 +166,7 @@ AutoCat.Run = function(type)
 	AC.Lib.StartAttack()
 
 	-- 自动开启饰品（使用缓存的可用性检查结果，需要有目标且在近战范围）
-	if UnitExists("target") and not UnitIsDead("target") and CheckInteractDistance("target", 3) then
+	if AC.Lib.IsTargetInRange() then
 		if GetInventoryItemCooldown("player",13)==0 and AC.Options.trinketUpper==1 and AC.TrinketUsable.upper then
 			UseInventoryItem(13)
 		end
@@ -313,6 +313,7 @@ function AC.Combat.Bleed(useShapeshift)
     -- 变身回能逻辑
     if dmMana >= AC.Config.shapeshiftMana and gcdLeft < 0.05 and
        not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
+       not AC.Lib.Buff("自然变形") and
        (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.tigerFuryTimer and GetTime() - AC.Combat.tigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
         if useShapeshift then
             CastSpellByName("重整")
@@ -416,6 +417,7 @@ function AC.Combat.Backstab()
     -- end
     if dmMana >= AC.Config.shapeshiftMana and energyConserve < 1.7
        and not AC.Lib.Buff("狂暴") and not hasPredatorReveal
+       and not AC.Lib.Buff("自然变形")
        and myPower < AC.Config.tearEnergy - 20 then
         CastSpellByName("重整")
     end
@@ -523,6 +525,7 @@ function AC.Combat.RendBleed()
     -- 变身回能逻辑
     if dmMana >= AC.Config.shapeshiftMana and
         not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
+        not AC.Lib.Buff("自然变形") and
         (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.rendBleedTigerFuryTimer and GetTime() - AC.Combat.rendBleedTigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
         CastSpellByName("重整")
         return

@@ -488,3 +488,20 @@ function AC.Lib.CanBleed(unit)
 	return true
 end
 
+-- 检查目标是否在近战距离内（用于饰品等物品使用）
+function AC.Lib.IsTargetInRange()
+	if not UnitExists("target") or UnitIsDead("target") then
+		return false
+	end
+	
+	-- 优先使用TargetDistance的UnitXP判断逻辑
+	if AC.Event.UnitXP_SP3 then
+		-- 近战距离：距离小于1码
+		local distance = UnitXP("distanceBetween", "player", "target")
+		return (distance and distance < 2)
+	else
+		-- 回退到原有的距离判断
+		return CheckInteractDistance("target", 3)  -- 近战交互距离
+	end
+end
+
