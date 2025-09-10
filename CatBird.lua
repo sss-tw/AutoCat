@@ -23,27 +23,12 @@ DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r 鸟德模块开始加载..."
 
 -- 鸟德不需要额外的库，使用基础游戏API即可
 
--- 鸟德配置
-Bird.Options = {
-	-- 基础攻击设置
-	combat = {
-		autoActivate = true,     -- 自动使用激活
-		otInvulnerability = true,  -- OT吃有限无敌
-		executeThreshold = 19,   -- 斩杀阈值（百分比）
-	},
-	-- Eclipse等待时间设置
-	eclipse = {
-		solarWait = 15,    -- 日蚀结束后等待秒数
-		lunarWait = 12     -- 月蚀结束后等待秒数
-	}
-}
+-- 鸟德配置由共通设置管理，无需在此文件中定义
 
--- Eclipse状态管理
+-- Eclipse状态管理（基于昼至/夜至debuff判断等待）
 Bird.Eclipse = {
 	-- 当前状态："日蚀"、"月蚀" 或 ""
 	state = "",
-	-- 等待结束时间 (0表示无等待)
-	waitEndTime = 0,
 }
 
 
@@ -76,56 +61,54 @@ function Bird:OnEclipseGained(eclipseName)
 	
 	-- 更新状态
 	self.Eclipse.state = eclipseName
-	self.Eclipse.waitEndTime = 0
-	
-	-- 如果有等待期，重置它
-	if self.waitTimeoutId then
-		self.waitTimeoutId = nil
-	end
 end
 
 function Bird:OnEclipseLost(eclipseName)
 	self:DebugPrint("失去Eclipse：%s", eclipseName)
 	
-	-- 获取等待时间
-	local waitTime = 0
-	if eclipseName == "日蚀" then
-		waitTime = self.Options.eclipse.solarWait
-	elseif eclipseName == "月蚀" then
-		waitTime = self.Options.eclipse.lunarWait
-	end
-	
-	if waitTime > 0 then
-		-- 设置等待结束时间
-		self.Eclipse.waitEndTime = GetTime() + waitTime
-		self:DebugPrint("Eclipse等待%d秒，等待结束时间：%.1f", waitTime, self.Eclipse.waitEndTime)
-		
-		-- 设置定时器来清理状态（使用简单的时间跟踪）
-		self.waitTimeoutId = true
-	else
-		-- 立即清理状态
-		self:OnEclipseWaitTimeout()
-	end
+	-- 简化处理：状态保持，等待通过debuff判断
+	-- self.Eclipse.state 保持不变，通过昼至/夜至debuff判断等待状态
 end
 
-function Bird:OnEclipseWaitTimeout()
-	self:DebugPrint("Eclipse等待超时，重置状态")
-	self.Eclipse.state = ""
-	self.Eclipse.waitEndTime = 0
-	self.waitTimeoutId = nil
-end
-
--- 检查当前Eclipse状态
+-- 检查当前Eclipse状态（基于昼至/夜至debuff判断等待）
 function Bird:GetEclipseState()
-	-- 首先检查是否还在等待期
-	if self.Eclipse.waitEndTime > 0 and GetTime() >= self.Eclipse.waitEndTime then
-		-- 等待期已结束，清理状态
-		self:OnEclipseWaitTimeout()
+	-- 直接检查当前的Eclipse buff状态
+	local hasSolarEclipse = AC.Lib.Buff("日蚀")
+	local hasLunarEclipse = AC.Lib.Buff("月蚀")
+	
+	-- 检查昼至/夜至debuff状态
+	local hasDayfall = AC.Lib.Buff("昼至")  -- 日蚀相关debuff
+	local hasNightfall = AC.Lib.Buff("夜至")  -- 月蚀相关debuff
+	
+	local currentState = ""
+	local isWaiting = false
+	
+	if hasSolarEclipse then
+		-- 有日蚀buff：正常日蚀期
+		currentState = "日蚀"
+		isWaiting = false
+	elseif hasLunarEclipse then
+		-- 有月蚀buff：正常月蚀期
+		currentState = "月蚀"
+		isWaiting = false
+	elseif hasDayfall and not hasSolarEclipse then
+		-- 有昼至debuff但没有日蚀buff：日蚀等待期
+		currentState = "日蚀"
+		isWaiting = true
+	elseif hasNightfall and not hasLunarEclipse then
+		-- 有夜至debuff但没有月蚀buff：月蚀等待期
+		currentState = "月蚀"
+		isWaiting = true
+	else
+		-- 无Eclipse状态
+		currentState = ""
+		isWaiting = false
 	end
 	
-	-- 返回当前状态和是否在等待期
-	local isWaiting = self.Eclipse.waitEndTime > 0 and GetTime() < self.Eclipse.waitEndTime
-	return self.Eclipse.state, isWaiting
+	-- 更新内部状态
+	self.Eclipse.state = currentState
+	
+	return currentState, isWaiting
 end
 
 -- 检查Eclipse buff状态变化（由UNIT_AURA事件触发）
@@ -211,8 +194,6 @@ function Bird:CastAll()
 	-- 确保在正确的形态下
 	self:EnsureCorrectForm()
 
-
-	
 	-- OT处理：当成为怪物攻击目标时的应对策略
 	if combat and UnitExists("target") and UnitExists("targettarget") and UnitIsUnit("player", "targettarget") then
 		local targetMaxHealth = UnitHealthMax("target")
@@ -337,9 +318,8 @@ function Bird:IsInMoonkinForm()
 	return false
 end
 
--- 鸟德战斗流程（基于平衡德宏逻辑，集成Eclipse状态管理）
+-- 鸟德战斗流程（DruidBird技能释放逻辑 + AutoCat buff判断）
 function Bird:BirdCombatFlow()
-	local mana = UnitMana("player")
 	local targetHealth = UnitHealth("target")
 	local targetMaxHealth = UnitHealthMax("target")
 	local targetHealthPercent = 0
@@ -352,41 +332,40 @@ function Bird:BirdCombatFlow()
 		return
 	end
 	
-	-- 获取Eclipse状态信息
+	-- 新逻辑不再依赖Eclipse状态，但保留用于调试
 	local eclipseState, isEclipseWaiting = self:GetEclipseState()
 	
-	self:DebugPrint("鸟德攻击流程：法力%d，目标血量%.1f%%，Eclipse状态：%s，等待中：%s", 
-		mana, targetHealthPercent, eclipseState or "无", tostring(isEclipseWaiting))
-	
-	-- 检查目标DOT状态（使用与猫德相同的检测方式）
+	-- 使用AutoCat的DOT状态检查
 	local swarm = AC.Event.GetSwarmDot()
 	local moonfire = AC.Event.GetMoonfireDot()
 	
-	-- 检查自身BUFF状态
-	local hasStarshift = AC.Lib.Buff("斗转星移")
-	local hasNatureBlessing = AC.Lib.Buff("自然之赐")
+	-- 使用AutoCat的BUFF状态检查
 	local hasBalance = AC.Lib.Buff("万物平衡")
 	local hasDayfall = AC.Lib.Buff("昼至")
 	local hasNightfall = AC.Lib.Buff("夜至")
 	
-	-- 饰品使用已在CastAll中处理，此处移除重复逻辑
+	local hasSolarEclipse = AC.Lib.Buff("日蚀")
+	local hasLunarEclipse = AC.Lib.Buff("月蚀")
 	
-	-- 斗转星移状态下的优先级
-	if hasStarshift then
-		if eclipseState == "月蚀" then
-			CastSpellByName("星火术")
-			self:DebugPrint("斗转星移+月蚀：星火术")
-		else
-			CastSpellByName("愤怒")
-			self:DebugPrint("斗转星移：愤怒")
+	local mana = UnitMana("player")
+	
+	self:DebugPrint("鸟德攻击流程：目标血量%.1f%%，法力%d，日蚀：%s，月蚀：%s，昼至：%s，夜至：%s，虫群：%s，月火：%s，自然之赐：%s，万物平衡：%s", 
+		targetHealthPercent, mana, tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
+	
+	-- 可否减益函数（使用AutoCat的DOT检查）
+	local function CanDebuff(name)
+		if name == "虫群" then
+			return not swarm
+		elseif name == "月火术" then
+			return not moonfire
 		end
-		return
+		return false
 	end
 	
-	-- 斩杀阶段优先级最高
+	-- DruidBird斩杀逻辑：目标生命小于等于设定百分比时
 	if targetHealthPercent > 0 and targetHealthPercent <= AC.Options.bird.combat.executeThreshold then
 		if hasBalance then
-			-- 有万物平衡时优选星火术（避免弹道时间）
+			-- 有万物平衡，打星火术（愤怒有弹道时间）
 			CastSpellByName("星火术")
 			self:DebugPrint("斩杀阶段+万物平衡：星火术")
 		else
@@ -396,119 +375,137 @@ function Bird:BirdCombatFlow()
 		return
 	end
 	
-	-- 蓝量不足时使用激活
-	if AC.Options.bird.combat.autoActivate then
-		if mana < 1000 and AC.Lib.SpellReady("激活") then
+	-- 法力管理：激活、草药茶/符文
+	-- 1. 激活逻辑：确保给自己使用
+	if AC.Options.bird.mana.autoActivate then
+		if mana < AC.Options.bird.mana.activateValue and AC.Lib.SpellReady("激活") then
+			-- 保存当前目标
+			local currentTargetName = UnitName("target")
+			-- 目标自己使用激活
+			TargetUnit("player")
 			CastSpellByName("激活")
-			self:DebugPrint("法力不足(%d)，使用激活", mana)
+			self:DebugPrint("法力不足(%d < %d)，对自己使用激活", mana, AC.Options.bird.mana.activateValue)
+			-- 恢复之前的目标
+			if currentTargetName then
+				TargetByName(currentTargetName)
+			else
+				ClearTarget()
+			end
 			return
 		end
 	end
 	
-	-- Eclipse状态输出循环（使用精确的状态管理）
-	if eclipseState == "日蚀" and not isEclipseWaiting then
-		-- 日蚀状态：自然伤害增强25%
-		if not swarm then
-			-- 日蚀时优先虫群（自然伤害DOT）
-			CastSpellByName("虫群")
-			AC.Event.lastSwarmTime = GetTime()
-			self:DebugPrint("日蚀：施放虫群")
-			return
-		elseif not hasNatureBlessing and not moonfire then
-			-- 补月火术（为愤怒减耗做准备）
-			CastSpellByName("月火术")
-			AC.Event.lastMoonfireTime = GetTime()
-			self:DebugPrint("日蚀：施放月火术")
-			return
-		elseif not AC.Lib.Buff("精灵之火", "target") and targetMaxHealth > 200000 then
-			-- Boss目标补精灵之火
-			CastSpellByName("精灵之火")
-			self:DebugPrint("日蚀Boss：施放精灵之火")
-			return
-		else
-			-- 日蚀时主要输出：愤怒（自然伤害）
-			CastSpellByName("愤怒")
-			self:DebugPrint("日蚀：愤怒")
-			return
+	-- 2. 草药茶/符文逻辑（根据血量条件选择）
+	if AC.Options.bird.mana.consumable then
+		if mana < AC.Options.bird.mana.consumableValue then
+			local health = UnitHealth("player")
+			local maxHealth = UnitHealthMax("player")
+			local healthPercent = (health / maxHealth) * 100
+			
+			if healthPercent < 50 then
+				-- 血量低于50%，使用草药茶
+				AC.Lib.UseItemByName("诺达纳尔草药茶")
+				self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用草药茶", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+			else
+				-- 血量>=50%，优先使用恶魔符文，没有则用黑暗符文
+				if AC.Lib.UseItemByName("恶魔符文") then
+					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用恶魔符文", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+				elseif AC.Lib.UseItemByName("黑暗符文") then
+					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用黑暗符文", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+				end
+			end
+			-- 注意：这里不return，继续往下走
 		end
-	elseif eclipseState == "月蚀" and not isEclipseWaiting then
-		-- 月蚀状态：奥术伤害增强25%
-		if not moonfire then
-			-- 月蚀时优先月火术（奥术伤害DOT）
-			CastSpellByName("月火术")
-			AC.Event.lastMoonfireTime = GetTime()
-			self:DebugPrint("月蚀：施放月火术")
-			return
-		elseif not swarm then
-			-- 补虫群（为星火术减时做准备）
-			CastSpellByName("虫群")
-			AC.Event.lastSwarmTime = GetTime()
-			self:DebugPrint("月蚀：施放虫群")
-			return
-		elseif not AC.Lib.Buff("精灵之火", "target") and targetMaxHealth > 200000 then
-			-- Boss目标补精灵之火
-			CastSpellByName("精灵之火")
-			self:DebugPrint("月蚀Boss：施放精灵之火")
-			return
-		else
-			-- 月蚀时主要输出：星火术（奥术伤害）
+	end
+	
+	-- 新的技能释放逻辑
+	-- 1. 虫群没了补虫群
+	if CanDebuff("虫群") then
+		CastSpellByName("虫群")
+		AC.Event.lastSwarmTime = GetTime()
+		self:DebugPrint("补虫群")
+		return
+	end
+	
+	-- 2. 月火没了补月火
+	if CanDebuff("月火术") then
+		CastSpellByName("月火术")
+		AC.Event.lastMoonfireTime = GetTime()
+		self:DebugPrint("补月火术")
+		return
+	end
+	
+	-- 2.5. 日蚀/月蚀状态优先级（在昼至/夜至之前）
+	local hasSolarEclipse = AC.Lib.Buff("日蚀")
+	local hasLunarEclipse = AC.Lib.Buff("月蚀")
+	
+	if hasSolarEclipse then
+		CastSpellByName("愤怒")
+		self:DebugPrint("日蚀：愤怒")
+		return
+	end
+	
+	if hasLunarEclipse then
+		CastSpellByName("星火术")
+		self:DebugPrint("月蚀：星火术")
+		return
+	end
+	
+	-- 3. 检查昼至和夜至状态（剩余时间判断）
+	local hasDayfall = AC.Lib.Buff("昼至")
+	local hasNightfall = AC.Lib.Buff("夜至")
+	local dayfallTimeLeft = self:GetBuffTimeLeft("昼至")
+	local nightfallTimeLeft = self:GetBuffTimeLeft("夜至")
+	
+	-- 昼至剩余2秒以下，不视为昼至状态
+	if hasDayfall and dayfallTimeLeft and dayfallTimeLeft <= 2 then
+		hasDayfall = false
+		self:DebugPrint("昼至剩余%.1f秒，不视为昼至状态", dayfallTimeLeft)
+	end
+	
+	-- 夜至剩余2秒以下，不视为夜至状态
+	if hasNightfall and nightfallTimeLeft and nightfallTimeLeft <= 1 then
+		hasNightfall = false
+		self:DebugPrint("夜至剩余%.1f秒，不视为夜至状态", nightfallTimeLeft)
+	end
+	
+	-- 4. 昼至状态下打星火术
+	if hasDayfall and not hasNightfall then
+		CastSpellByName("星火术")
+		self:DebugPrint("昼至状态：星火术")
+		return
+	end
+	
+	-- 5. 夜至状态下打愤怒
+	if hasNightfall and not hasDayfall then
+		CastSpellByName("愤怒")
+		self:DebugPrint("夜至状态：愤怒")
+		return
+	end
+	
+	-- 6. 两个状态都有或者都没有的情况
+	if (hasDayfall and hasNightfall) or (not hasDayfall and not hasNightfall) then
+		local hasNatureBlessing = AC.Lib.Buff("自然之赐")
+		local hasBalance = AC.Lib.Buff("万物平衡")
+		
+		if hasNatureBlessing and hasBalance then
+			-- 都有：打星火
 			CastSpellByName("星火术")
-			self:DebugPrint("月蚀：星火术")
-			return
-		end
-	elseif isEclipseWaiting then
-		-- Eclipse等待期：维持基本循环，避免浪费Eclipse
-		if not swarm then
-			CastSpellByName("虫群")
-			AC.Event.lastSwarmTime = GetTime()
-			self:DebugPrint("Eclipse等待期：维持虫群")
-			return
-		elseif not moonfire then
-			CastSpellByName("月火术")
-			AC.Event.lastMoonfireTime = GetTime()
-			self:DebugPrint("Eclipse等待期：维持月火术")
-			return
-		else
-			-- 等待期保守输出，优选愤怒
+			self:DebugPrint("自然之赐+万物平衡：星火术")
+		elseif hasNatureBlessing and not hasBalance then
+			-- 只有自然之赐：打愤怒
 			CastSpellByName("愤怒")
-			self:DebugPrint("Eclipse等待期：愤怒")
-			return
-		end
-	else
-		-- 无Eclipse状态：维持DOT，根据BUFF选择技能
-		if not swarm then
-			-- 虫群优先级最高（获得万物平衡几率）
-			CastSpellByName("虫群")
-			AC.Event.lastSwarmTime = GetTime()
-			self:DebugPrint("常规：施放虫群")
-			return
-		elseif not hasNatureBlessing and not moonfire then
-			-- 没有自然之赐时补月火术（获得自然之赐几率）
-			CastSpellByName("月火术")
-			AC.Event.lastMoonfireTime = GetTime()
-			self:DebugPrint("常规：施放月火术")
-			return
-		elseif not AC.Lib.Buff("精灵之火", "target") and targetMaxHealth > 200000 then
-			-- Boss目标补精灵之火
-			CastSpellByName("精灵之火")
-			self:DebugPrint("常规Boss：施放精灵之火")
-			return
-		elseif hasBalance then
-			-- 有万物平衡：星火术（减少施法时间）
+			self:DebugPrint("自然之赐：愤怒")
+		elseif not hasNatureBlessing and hasBalance then
+			-- 只有万物平衡：打星火
 			CastSpellByName("星火术")
 			self:DebugPrint("万物平衡：星火术")
-			return
-		elseif hasDayfall or not hasNightfall then
-			-- 昼至或非夜至：星火术（触发Eclipse几率）
-			CastSpellByName("星火术")
-			self:DebugPrint("昼至/非夜至：星火术")
-			return
 		else
-			-- 默认：愤怒（触发Eclipse几率）
+			-- 都没有：打愤怒
 			CastSpellByName("愤怒")
-			self:DebugPrint("默认：愤怒")
-			return
+			self:DebugPrint("无buff：愤怒")
 		end
+		return
 	end
 end
 
@@ -539,6 +536,62 @@ SlashCmdList["AUTOCATBIRD"] = function(msg)
     AutoBird()
 end
 
+-- 获取buff剩余时间（参考CheckBuffer实现）
+function Bird:GetBuffTimeLeft(buffName, unit)
+    unit = unit or "player"
+    
+    -- 只支持检查玩家自己的buff
+    if unit ~= "player" then
+        return nil, "仅支持检查玩家buff"
+    end
+    
+    -- 方法1：使用CheckBuffer的方式（GetPlayerAuraIndex + GetPlayerBuffTimeLeft）
+    if GetPlayerAuraIndex and GetPlayerBuffTimeLeft then
+        local buffIndex = GetPlayerAuraIndex(buffName)
+        if buffIndex and buffIndex >= 0 then
+            local timeLeft = GetPlayerBuffTimeLeft(buffIndex)
+            return timeLeft, string.format("CheckBuffer方式: 剩余%.1f秒", timeLeft)
+        end
+    end
+    
+    -- 方法2：使用AutoCat的方式作为备选
+    local found, index = AC.Lib.Buff(buffName, unit)
+    if found then
+        -- 尝试使用GetPlayerBuffTimeLeft
+        if GetPlayerBuffTimeLeft then
+            local timeLeft = GetPlayerBuffTimeLeft(index)
+            if timeLeft then
+                return timeLeft, string.format("AutoCat+时间API: 剩余%.1f秒", timeLeft)
+            end
+        end
+        
+        return 0, "找到buff但无法获取剩余时间"
+    end
+    
+    return nil, "未找到buff"
+end
+
+-- 增强版Eclipse状态检查（含剩余时间）
+function Bird:GetEclipseStateWithTime()
+    local eclipseState, isWaiting = self:GetEclipseState()
+    
+    local eclipseTimeLeft = nil
+    local dayfallTimeLeft = nil
+    local nightfallTimeLeft = nil
+    
+    -- 获取各buff剩余时间
+    if eclipseState == "日蚀" then
+        eclipseTimeLeft = self:GetBuffTimeLeft("日蚀")
+    elseif eclipseState == "月蚀" then
+        eclipseTimeLeft = self:GetBuffTimeLeft("月蚀")
+    end
+    
+    dayfallTimeLeft = self:GetBuffTimeLeft("昼至")
+    nightfallTimeLeft = self:GetBuffTimeLeft("夜至")
+    
+    return eclipseState, isWaiting, eclipseTimeLeft, dayfallTimeLeft, nightfallTimeLeft
+end
+
 -- 注册测试Eclipse状态的斜杠命令
 SLASH_BIRDECLIPSE1 = "/birdeclipse"
 SLASH_BIRDECLIPSE2 = "/be"
@@ -550,13 +603,51 @@ SlashCmdList["BIRDECLIPSE"] = function(msg)
     end
     
     local eclipseState, isWaiting = AC.Bird:GetEclipseState()
-    local waitTimeLeft = ""
-    if isWaiting and AC.Bird.Eclipse.waitEndTime > 0 then
-        waitTimeLeft = string.format("，剩余%.1f秒", AC.Bird.Eclipse.waitEndTime - GetTime())
+    
+    -- 检查相关buff状态
+    local hasSolarEclipse = AC.Lib.Buff("日蚀")
+    local hasLunarEclipse = AC.Lib.Buff("月蚀")
+    local hasDayfall = AC.Lib.Buff("昼至")
+    local hasNightfall = AC.Lib.Buff("夜至")
+    
+    DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Bird Eclipse:|r 状态：%s，等待中：%s", 
+        eclipseState or "无", tostring(isWaiting)))
+    DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Bird Buffs:|r 日蚀：%s，月蚀：%s，昼至：%s，夜至：%s", 
+        tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall)))
+    
+    -- 测试buff剩余时间获取
+    if msg == "time" then
+        local buffsToTest = {"日蚀", "月蚀", "昼至", "夜至", "万物平衡", "自然之赐"}
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird Time Test:|r 检测buff剩余时间")
+        for _, buffName in ipairs(buffsToTest) do
+            local timeLeft, info = AC.Bird:GetBuffTimeLeft(buffName)
+            if timeLeft then
+                DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF00FF00✓|r %s - %s", buffName, info))
+            else
+                DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFFFF0000✗|r %s - %s", buffName, info))
+            end
+        end
+        return
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Bird Eclipse:|r 状态：%s，等待中：%s%s", 
-        eclipseState or "无", tostring(isWaiting), waitTimeLeft))
+    -- 增强版Eclipse信息显示
+    if msg == "full" then
+        local eclipseState, isWaiting, eclipseTimeLeft, dayfallTimeLeft, nightfallTimeLeft = AC.Bird:GetEclipseStateWithTime()
+        
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Bird Eclipse Full:|r 状态：%s，等待中：%s", 
+            eclipseState or "无", tostring(isWaiting)))
+            
+        if eclipseTimeLeft then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF00FF00Eclipse:|r 剩余%.1f秒", eclipseTimeLeft))
+        end
+        if dayfallTimeLeft then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFFFFAA00昼至:|r 剩余%.1f秒", dayfallTimeLeft))
+        end
+        if nightfallTimeLeft then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF0088FF夜至:|r 剩余%.1f秒", nightfallTimeLeft))
+        end
+        return
+    end
     
     -- 测试命令：模拟Eclipse获得/失去
     if msg == "solar" then
@@ -577,3 +668,5 @@ end
 -- 调试输出确认函数注册
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r AutoBird函数和命令已注册")
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r Eclipse测试命令：/birdeclipse 或 /be")
+DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r Buff时间测试：/be time")
+DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r 完整信息显示：/be full")

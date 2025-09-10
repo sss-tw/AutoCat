@@ -104,15 +104,16 @@ local defaultConfig = {
 	bird = {
 		-- 战斗设置
 		combat = {
-			autoActivate = true,         -- 自动使用激活
 			otInvulnerability = true,    -- OT吃有限无敌
 			executeThreshold = 19,       -- 斩杀阈值（百分比）
 		},
-		-- Eclipse等待时间设置
-		eclipse = {
-			solarWait = 15,    -- 日蚀结束后等待秒数
-			lunarWait = 12     -- 月蚀结束后等待秒数
-		}
+		-- 法力管理设置
+		mana = {
+			autoActivate = true,         -- 自动使用激活
+			activateValue = 1000,        -- 激活触发法力阈值
+			consumable = false,          -- 自动使用草药茶/符文
+			consumableValue = 3000,       -- 草药茶/符文触发法力阈值
+		},
 	}
 }
 
@@ -349,17 +350,6 @@ function Cat:OnInitialize()
 				desc = "设置鸟德战斗相关选项",
 				order = 2,
 				args = {
-					auto_activate = {
-						type = "toggle",
-						name = "自动使用激活",
-						desc = "无蓝时自动使用激活技能",
-						order = 1,
-						get = function() return self.db.profile.bird.combat.autoActivate end,
-						set = function(value) 
-							self.db.profile.bird.combat.autoActivate = value
-							self:ApplyConfig()
-						end
-					},
 					ot_invulnerability = {
 						type = "toggle",
 						name = "OT吃有限无敌",
@@ -385,31 +375,58 @@ function Cat:OnInitialize()
 							self:ApplyConfig()
 						end
 					},
-					solarWait = {
-						type = "range",
-						name = "日蚀等待时间",
-						desc = "日蚀结束后等待多少秒才重新触发Eclipse循环",
-						order = 4,
-						min = 0,
-						max = 60,
-						step = 1,
-						get = function() return self.db.profile.bird.eclipse.solarWait end,
+					mana_header = {
+						type = "header",
+						name = "法力管理",
+						order = 6,
+					},
+					auto_activate = {
+						type = "toggle",
+						name = "自动使用激活",
+						desc = "法力不足时自动使用激活技能",
+						order = 7,
+						get = function() return self.db.profile.bird.mana.autoActivate end,
 						set = function(value) 
-							self.db.profile.bird.eclipse.solarWait = value
+							self.db.profile.bird.mana.autoActivate = value
 							self:ApplyConfig()
 						end
 					},
-					lunarWait = {
+					activate_value = {
 						type = "range",
-						name = "月蚀等待时间",
-						desc = "月蚀结束后等待多少秒才重新触发Eclipse循环",
-						order = 5,
-						min = 0,
-						max = 60,
-						step = 1,
-						get = function() return self.db.profile.bird.eclipse.lunarWait end,
+						name = "激活触发法力",
+						desc = "当法力低于此值时使用激活",
+						order = 8,
+						min = 300,
+						max = 7000,
+						step = 100,
+						get = function() return self.db.profile.bird.mana.activateValue end,
 						set = function(value) 
-							self.db.profile.bird.eclipse.lunarWait = value
+							self.db.profile.bird.mana.activateValue = value
+							self:ApplyConfig()
+						end
+					},
+					consumable = {
+						type = "toggle",
+						name = "自动使用消耗品",
+						desc = "法力不足时自动使用草药茶或符文（根据血量选择）",
+						order = 9,
+						get = function() return self.db.profile.bird.mana.consumable end,
+						set = function(value) 
+							self.db.profile.bird.mana.consumable = value
+							self:ApplyConfig()
+						end
+					},
+					consumable_value = {
+						type = "range",
+						name = "消耗品触发法力",
+						desc = "当法力低于此值时使用草药茶/符文（血量<50%用草药茶，>=50%用符文）",
+						order = 10,
+						min = 300,
+						max = 7000,
+						step = 100,
+						get = function() return self.db.profile.bird.mana.consumableValue end,
+						set = function(value) 
+							self.db.profile.bird.mana.consumableValue = value
 							self:ApplyConfig()
 						end
 					}
@@ -969,20 +986,16 @@ function Cat:ApplyConfig()
     -- 鸟德设置 - 融合到AutoCat.Options
     AutoCat.Options.bird = {
         combat = {
-            autoActivate = self.db.profile.bird.combat.autoActivate,
             otInvulnerability = self.db.profile.bird.combat.otInvulnerability,
             executeThreshold = self.db.profile.bird.combat.executeThreshold
         },
-        eclipse = {
-            solarWait = self.db.profile.bird.eclipse.solarWait,
-            lunarWait = self.db.profile.bird.eclipse.lunarWait
+        mana = {
+            autoActivate = self.db.profile.bird.mana.autoActivate,
+            activateValue = self.db.profile.bird.mana.activateValue,
+            consumable = self.db.profile.bird.mana.consumable,
+            consumableValue = self.db.profile.bird.mana.consumableValue
         }
     }
-    
-    -- 同步Eclipse配置到鸟德模块
-    if AutoCat.Bird and AutoCat.Bird.Options then
-        AutoCat.Bird.Options.eclipse = AutoCat.Options.bird.eclipse
-    end
 end
 
 function Cat:OnEnable()
