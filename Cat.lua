@@ -554,6 +554,27 @@ SlashCmdList["AUTOCAT"] = function(msg)
         if level >= 1 and level <= 3 then
             Cat:SetDebugLevel(level)
         end
+    elseif msg == "enable" then
+        -- 强制启用插件，清除所有disabled状态
+        pcall(function()
+            if AutoCatDB then
+                AutoCatDB.disabled = nil
+            end
+        end)
+        
+        if Cat and Cat.db then
+            if Cat.db.profile then
+                Cat.db.profile.disabled = nil
+                Cat.db.profile.hidden = nil
+            end
+        end
+        
+        -- 强制显示插件
+        if Cat and Cat.Show then
+            Cat:Show()
+        end
+        
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00AutoCat:|r 插件已强制启用，所有禁用状态已清除")
     else
         -- 如果有参数，尝试转换为数字
         local param = nil

@@ -407,11 +407,15 @@ function Bird:BirdCombatFlow()
 				AC.Lib.UseItemByName("诺达纳尔草药茶")
 				self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用草药茶", mana, AC.Options.bird.mana.consumableValue, healthPercent)
 			else
-				-- 血量>=50%，优先使用恶魔符文，没有则用黑暗符文
+				-- 血量>=50%，优先使用恶魔符文，没有则用黑暗符文，如果都没有则用草药茶
 				if AC.Lib.UseItemByName("恶魔符文") then
 					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用恶魔符文", mana, AC.Options.bird.mana.consumableValue, healthPercent)
 				elseif AC.Lib.UseItemByName("黑暗符文") then
 					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用黑暗符文", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+				else
+					-- 没有符文，回退到草药茶
+					AC.Lib.UseItemByName("诺达纳尔草药茶")
+					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，无符文可用，使用草药茶", mana, AC.Options.bird.mana.consumableValue, healthPercent)
 				end
 			end
 			-- 注意：这里不return，继续往下走
