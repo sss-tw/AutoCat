@@ -233,16 +233,30 @@ function AC.Combat.Bleed(useShapeshift)
     local isBoss = UnitClassification("target") == "worldboss" or (targetMaxHealth and targetMaxHealth > 100000)
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
-        -- 背对对手时装备撕裂神像，否则装备凶猛神像
-        if isBehind then
-            -- 检查是否已经装备撕裂神像
-            if not AC.Lib.CheckInventoryItemName(18, "撕裂神像") then
-                UseItemByName("撕裂神像")
+        -- 检查是否满足撕扯条件
+        local shouldRip = (not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal)) or
+                         (not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal))
+        
+        -- 检查是否满足扫击条件
+        local shouldRake = not rakeDot and (myPower >= AC.Config.rakeEnergy or hasPredatorReveal) and not AC.Lib.Buff("血袭")
+        
+        -- 如果满足撕扯或扫击条件，优先装备野蛮神像
+        if shouldRip or shouldRake then
+            if not AC.Lib.CheckInventoryItemName(18, "野蛮神像") then
+                UseItemByName("野蛮神像")
             end
         else
-            -- 检查是否已经装备凶猛神像
-            if not AC.Lib.CheckInventoryItemName(18, "凶猛神像") then
-                UseItemByName("凶猛神像")
+            -- 否则按原逻辑：背对对手时装备撕裂神像，否则装备凶猛神像
+            if isBehind then
+                -- 检查是否已经装备撕裂神像
+                if not AC.Lib.CheckInventoryItemName(18, "撕裂神像") then
+                    UseItemByName("撕裂神像")
+                end
+            else
+                -- 检查是否已经装备凶猛神像
+                if not AC.Lib.CheckInventoryItemName(18, "凶猛神像") then
+                    UseItemByName("凶猛神像")
+                end
             end
         end
     end
