@@ -430,7 +430,56 @@ function Bird:BirdCombatFlow()
 	end
 
 	-- 新的技能释放逻辑
-	-- 1. 虫群没了补虫群
+	-- 1. 检查日蚀/月蚀状态（最高优先级）
+	local hasSolarEclipse = AC.Lib.Buff("日蚀")
+	local hasLunarEclipse = AC.Lib.Buff("月蚀")
+	
+	if hasSolarEclipse then
+		local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
+		-- 日蚀剩余时间不够打愤怒(0.8秒)时，优先补DOT
+		if solarTimeLeft and solarTimeLeft < 0.8 then
+			if CanDebuff("月火术") then
+				CastSpellByName("月火术")
+				AC.Event.lastMoonfireTime = GetTime()
+				self:DebugPrint("日蚀剩余%.1f秒，优先月火术", solarTimeLeft)
+				return
+			elseif CanDebuff("虫群") then
+				CastSpellByName("虫群")
+				AC.Event.lastSwarmTime = GetTime()
+				self:DebugPrint("日蚀剩余%.1f秒，补虫群", solarTimeLeft)
+				return
+			end
+		end
+		-- 日蚀期间不补DOT，专注愤怒
+		CastSpellByName("愤怒")
+		self:DebugPrint("日蚀：愤怒(剩余%.1f秒)", solarTimeLeft or 0)
+		return
+	end
+	
+	if hasLunarEclipse then
+		local lunarTimeLeft = self:GetBuffTimeLeft("月蚀")
+		-- 月蚀剩余时间不够打星火术(1.5秒)时，优先补DOT
+		if lunarTimeLeft and lunarTimeLeft < 1.5 then
+			if CanDebuff("虫群") then
+				CastSpellByName("虫群")
+				AC.Event.lastSwarmTime = GetTime()
+				self:DebugPrint("月蚀剩余%.1f秒，优先虫群", lunarTimeLeft)
+				return
+			elseif CanDebuff("月火术") then
+				CastSpellByName("月火术")
+				AC.Event.lastMoonfireTime = GetTime()
+				self:DebugPrint("月蚀剩余%.1f秒，补月火术", lunarTimeLeft)
+				return
+			end
+		end
+		-- 月蚀期间不补DOT，专注星火术
+		CastSpellByName("星火术")
+		self:DebugPrint("月蚀：星火术(剩余%.1f秒)", lunarTimeLeft or 0)
+		return
+	end
+	
+	-- 2. 非Eclipse期间，正常DOT维护
+	-- 虫群没了补虫群
 	if CanDebuff("虫群") then
 		CastSpellByName("虫群")
 		AC.Event.lastSwarmTime = GetTime()
@@ -438,27 +487,11 @@ function Bird:BirdCombatFlow()
 		return
 	end
 	
-	-- 2. 月火没了补月火
+	-- 月火没了补月火
 	if CanDebuff("月火术") then
 		CastSpellByName("月火术")
 		AC.Event.lastMoonfireTime = GetTime()
 		self:DebugPrint("补月火术")
-		return
-	end
-	
-	-- 2.5. 日蚀/月蚀状态优先级（在昼至/夜至之前）
-	local hasSolarEclipse = AC.Lib.Buff("日蚀")
-	local hasLunarEclipse = AC.Lib.Buff("月蚀")
-	
-	if hasSolarEclipse then
-		CastSpellByName("愤怒")
-		self:DebugPrint("日蚀：愤怒")
-		return
-	end
-	
-	if hasLunarEclipse then
-		CastSpellByName("星火术")
-		self:DebugPrint("月蚀：星火术")
 		return
 	end
 	
