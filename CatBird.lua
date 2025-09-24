@@ -349,8 +349,8 @@ function Bird:BirdCombatFlow()
 	
 	local mana = UnitMana("player")
 	
-	self:DebugPrint("鸟德攻击流程：目标血量%.1f%%，法力%d，日蚀：%s，月蚀：%s，昼至：%s，夜至：%s，虫群：%s，月火：%s，自然之赐：%s，万物平衡：%s", 
-		targetHealthPercent, mana, tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
+	self:DebugPrint("鸟德攻击流程：目标血量%.1f%%，法力%d，奥术免疫：%s，日蚀：%s，月蚀：%s，昼至：%s，夜至：%s，虫群：%s，月火：%s，自然之赐：%s，万物平衡：%s", 
+		targetHealthPercent, mana, tostring(not not AC.Config.targetArcaneImmune), tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
 	
 	-- 可否减益函数（使用AutoCat的DOT检查）
 	local function CanDebuff(name)
@@ -422,6 +422,13 @@ function Bird:BirdCombatFlow()
 		end
 	end
 	
+	-- 奥术免疫检查：如果目标奥术免疫，只使用愤怒（自然伤害）
+	if AC.Config.targetArcaneImmune then
+		CastSpellByName("愤怒")
+		self:DebugPrint("目标奥术免疫：只使用愤怒")
+		return
+	end
+
 	-- 新的技能释放逻辑
 	-- 1. 虫群没了补虫群
 	if CanDebuff("虫群") then

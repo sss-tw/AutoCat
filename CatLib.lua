@@ -12,6 +12,7 @@ local _tipColor = "|cFF906d96Cat Tip:|r |cFFf9cdfd"
 
 -- 配置变量
 AC.Config.targetBleed = true -- 目标是否可以流血
+AC.Config.targetArcaneImmune = false -- 目标是否奥术免疫
 AC.Config.clawEnergy = 40 -- 爪击所需能量
 AC.Config.rakeEnergy = 35 -- 扫击所需能量
 AC.Config.tearEnergy = 60 -- 撕扯所需能量
@@ -250,6 +251,36 @@ function AC.Lib.UseItemByName(itemName)
             if itemLink then
                 local _, _, name = string.find(itemLink, "%[(.-)%]")
                 if name == itemName then
+                    -- 创建隐藏的tooltip用于扫描物品描述
+                    if not AC.ItemScanTooltip then
+                        AC.ItemScanTooltip = CreateFrame("GameTooltip", "AutoCatItemScanTooltip", nil, "GameTooltipTemplate")
+                        AC.ItemScanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+                    end
+                    
+                    -- 清除之前的内容并设置当前物品
+                    AC.ItemScanTooltip:ClearLines()
+                    AC.ItemScanTooltip:SetBagItem(bag, slot)
+                    
+                    -- 扫描tooltip文本查找冷却时间相关字样
+                    local hasCooldownRemaining = false
+                    for i = 1, AC.ItemScanTooltip:NumLines() do
+                        local line = getglobal("AutoCatItemScanTooltipTextLeft" .. i)
+                        if line and line:GetText() then
+                            local text = line:GetText()
+                            -- 检查是否包含冷却时间相关字样
+                            if text and (strfind(text, "冷却时间剩余") or strfind(text, "冷却时间：")) then
+                                hasCooldownRemaining = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    -- 如果有冷却时间剩余，不使用物品并返回false
+                    if hasCooldownRemaining then
+                        return false
+                    end
+                    
+                    -- 没有冷却时间剩余，正常使用物品
                     UseContainerItem(bag, slot)
                     return true
                 end
@@ -460,6 +491,16 @@ local MPmonsterWhiteList = {
     ["长瘤的灌木兽"] = true,
 }
 
+-- 奥术免疫怪物名单
+local arcaneImmuneList = {
+    -- K40
+    ["溢出的法力"] = true,
+    ["异常的法力"] = true,
+    ["不稳定的奥术元素"] = true,
+    ["破碎的奥术元素"] = true,
+    ["阿诺玛鲁斯"] = true,
+}
+
 -- 检验单位能否流血
 function AC.Lib.CanBleed(unit)
 	unit = unit or "target"
@@ -488,9 +529,28 @@ function AC.Lib.CanBleed(unit)
 	return true
 end
 
+-- 检验单位是否奥术免疫
+function AC.Lib.IsArcaneImmune(unit)
+	unit = unit or "target"
+	local name = UnitName(unit)
+
+	if not name then
+		return false
+	end
+
+	-- 只检查奥术免疫名单
+	if arcaneImmuneList[name] == true then
+		return true
+	end
+
+	return false
+end
+
 -- 检查目标是否在近战距离内（用于饰品等物品使用）
+-- 同时检查目标是否为敌对单位且未死亡
 function AC.Lib.IsTargetInRange()
-	if not UnitExists("target") or UnitIsDead("target") then
+	-- 检查目标是否存在、是否死亡、是否为敌对单位
+	if not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target") then
 		return false
 	end
 	

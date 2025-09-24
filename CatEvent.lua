@@ -204,6 +204,8 @@ function AC.EventHandlers.OnEvent()
     elseif event == "PLAYER_TARGET_CHANGED" then
         -- 检测目标是否可以流血
         AC.Config.targetBleed = AC.Lib.CanBleed()
+        -- 检测目标是否奥术免疫
+        AC.Config.targetArcaneImmune = AC.Lib.IsArcaneImmune()
         
         -- 熊德目标变化处理
         if AC.Bear then
