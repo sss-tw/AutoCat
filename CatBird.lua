@@ -430,55 +430,7 @@ function Bird:BirdCombatFlow()
 	end
 
 	-- 新的技能释放逻辑
-	-- 1. 检查日蚀/月蚀状态（最高优先级）
-	local hasSolarEclipse = AC.Lib.Buff("日蚀")
-	local hasLunarEclipse = AC.Lib.Buff("月蚀")
-	
-	if hasSolarEclipse then
-		local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
-		-- 日蚀剩余时间不够打愤怒(0.8秒)时，优先补DOT
-		if solarTimeLeft and solarTimeLeft < 0.8 then
-			if CanDebuff("月火术") then
-				CastSpellByName("月火术")
-				AC.Event.lastMoonfireTime = GetTime()
-				self:DebugPrint("日蚀剩余%.1f秒，优先月火术", solarTimeLeft)
-				return
-			elseif CanDebuff("虫群") then
-				CastSpellByName("虫群")
-				AC.Event.lastSwarmTime = GetTime()
-				self:DebugPrint("日蚀剩余%.1f秒，补虫群", solarTimeLeft)
-				return
-			end
-		end
-		-- 日蚀期间不补DOT，专注愤怒
-		CastSpellByName("愤怒")
-		self:DebugPrint("日蚀：愤怒(剩余%.1f秒)", solarTimeLeft or 0)
-		return
-	end
-	
-	if hasLunarEclipse then
-		local lunarTimeLeft = self:GetBuffTimeLeft("月蚀")
-		-- 月蚀剩余时间不够打星火术(1.5秒)时，优先补DOT
-		if lunarTimeLeft and lunarTimeLeft < 1.5 then
-			if CanDebuff("虫群") then
-				CastSpellByName("虫群")
-				AC.Event.lastSwarmTime = GetTime()
-				self:DebugPrint("月蚀剩余%.1f秒，优先虫群", lunarTimeLeft)
-				return
-			elseif CanDebuff("月火术") then
-				CastSpellByName("月火术")
-				AC.Event.lastMoonfireTime = GetTime()
-				self:DebugPrint("月蚀剩余%.1f秒，补月火术", lunarTimeLeft)
-				return
-			end
-		end
-		-- 月蚀期间不补DOT，专注星火术
-		CastSpellByName("星火术")
-		self:DebugPrint("月蚀：星火术(剩余%.1f秒)", lunarTimeLeft or 0)
-		return
-	end
-	
-	-- 2. 非Eclipse期间，正常DOT维护
+	-- 1. DOT维护（最高优先级）
 	-- 虫群没了补虫群
 	if CanDebuff("虫群") then
 		CastSpellByName("虫群")
@@ -492,6 +444,64 @@ function Bird:BirdCombatFlow()
 		CastSpellByName("月火术")
 		AC.Event.lastMoonfireTime = GetTime()
 		self:DebugPrint("补月火术")
+		return
+	end
+
+	-- 2. 检查日蚀/月蚀状态（第二优先级）
+	local hasSolarEclipse = AC.Lib.Buff("日蚀")
+	local hasLunarEclipse = AC.Lib.Buff("月蚀")
+	
+	if hasSolarEclipse then
+		local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
+		-- 计算星火术实际施法时间(考虑buff减免)
+		local wrathCastTime = 1.5  -- 基础施法时间
+		
+		-- 检查自然恩典buff(减少0.5秒)
+		if AC.Lib.Buff("自然恩典") then
+			wrathCastTime = wrathCastTime - 0.5
+		end
+		
+		
+		-- 如果日蚀剩余时间不够打星火术，直接补虫群
+		if solarTimeLeft and solarTimeLeft < wrathCastTime then
+			CastSpellByName("虫群")
+			AC.Event.lastSwarmTime = GetTime()
+			self:DebugPrint("日蚀剩余%.1f秒(<%.1f)，直接补虫群", solarTimeLeft, wrathCastTime)
+			return
+		end
+		
+		-- 日蚀期间专注愤怒
+		CastSpellByName("愤怒")
+		self:DebugPrint("日蚀：愤怒(剩余%.1f秒)", solarTimeLeft or 0)
+		return
+	end
+	
+	if hasLunarEclipse then
+		local lunarTimeLeft = self:GetBuffTimeLeft("月蚀")
+		-- 计算星火术实际施法时间(考虑buff减免)
+		local starfireCastTime = 3.0  -- 基础施法时间
+
+		-- 检查自然恩典buff(减少0.5秒)
+		if AC.Lib.Buff("自然恩典") then
+			starfireCastTime = starfireCastTime - 0.5
+		end
+		
+		-- 检查万物平衡buff(减少0.5秒)
+		if AC.Lib.Buff("万物平衡") then
+			starfireCastTime = starfireCastTime - 0.5
+		end
+		
+		-- 月蚀最后1.5秒，直接补月火
+		if lunarTimeLeft and lunarTimeLeft <= starfireCastTime then
+			CastSpellByName("月火术")
+			AC.Event.lastMoonfireTime = GetTime()
+			self:DebugPrint("月蚀剩余%.1f秒，直接补月火", lunarTimeLeft)
+			return
+		end
+		
+		-- 月蚀期间专注星火术
+		CastSpellByName("星火术")
+		self:DebugPrint("月蚀：星火术(剩余%.1f秒)", lunarTimeLeft or 0)
 		return
 	end
 	
