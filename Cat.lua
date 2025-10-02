@@ -104,6 +104,21 @@ AutoCat.Run = function(type)
         end
 	end
 
+	-- Boss战中使用魂能之速（需要距离判断）
+	if combat and AC.Options.soulSpeedBoss == 1 and AC.Lib.IsTargetInRange() then
+		local targetMaxHealth = UnitHealthMax("target")
+		if targetMaxHealth and targetMaxHealth > 100000 then
+			-- 检查是否已有魂能之速buff
+			if not AC.Lib.Buff("魂能之速") then
+				-- 使用魂能之速
+				AC.Lib.UseItemByName("魂能之速")
+				if Cat and Cat:IsDebugging() then
+					DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r Boss战中使用魂能之速")
+				end
+			end
+		end
+	end
+
 	-- 确保在豹子形态下
 	if not AC.Lib.GetShape(3) then
 		CastSpellByName("猎豹形态(变形)")

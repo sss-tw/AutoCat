@@ -48,7 +48,8 @@ local defaultConfig = {
                 herbal_tea = true,           -- 是否自动使用草药茶
                 herbal_tea_value = 2000,     -- 草药茶使用血线
                 sacrifice_oil = false,       -- 是否自动使用献祭之油
-                ot_limited_invulnerability = false  -- OT吃有限无敌
+                ot_limited_invulnerability = false,  -- OT吃有限无敌
+                soul_speed_boss = false      -- Boss战中使用魂能之速
         },
         		-- 熊德设置（新增）
 		bear = {
@@ -866,16 +867,27 @@ function Cat:OnInitialize()
 							self:ApplyConfig()
 						end
 					},
+					soul_speed_boss = {
+						type = "toggle",
+						name = "Boss战使用魂能之速",
+						desc = "在Boss战中自动使用魂能之速",
+						order = 11,
+						get = function() return self.db.profile.consumable.soul_speed_boss end,
+						set = function(value)
+							self.db.profile.consumable.soul_speed_boss = value
+							self:ApplyConfig()
+						end
+					},
 					debug_header = {
 						type = "header",
 						name = "调试设置",
-						order = 11,
+						order = 12,
 					},
 					superwow_status = {
 						type = "text",
 						name = "SuperWoW模组状态",
 						desc = "显示SuperWoW模组是否成功导入",
-						order = 12,
+						order = 13,
 						get = function() 
 					if SUPERWOW_STRING then
 						return "已导入 (" .. (SUPERWOW_VERSION or "未知版本") .. ")"
@@ -889,7 +901,7 @@ function Cat:OnInitialize()
 						type = "text",
 						name = "UnitXP模组状态",
 						desc = "显示UnitXP_SP3模组是否成功导入",
-						order = 13,
+						order = 14,
 						get = function()
 					local UnitXP_SP3 = pcall(UnitXP, "nop", "nop")
 					if UnitXP_SP3 then
@@ -949,6 +961,7 @@ function Cat:ApplyConfig()
     AutoCat.Options.herbalTeaValue = self.db.profile.consumable.herbal_tea_value
     AutoCat.Options.sacrificeOil = self.db.profile.consumable.sacrifice_oil and 1 or 0
     AutoCat.Options.otLimitedInvulnerability = self.db.profile.consumable.ot_limited_invulnerability and 1 or 0
+    AutoCat.Options.soulSpeedBoss = self.db.profile.consumable.soul_speed_boss and 1 or 0
     
     -- 治疗设置
     AutoCat.Options.rejuvRank = self.db.profile.healing.rejuv_rank

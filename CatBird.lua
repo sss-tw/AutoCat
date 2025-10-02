@@ -194,6 +194,19 @@ function Bird:CastAll()
 	-- 确保在正确的形态下
 	self:EnsureCorrectForm()
 
+	-- Boss战中使用魂能之速
+	if combat and AC.Options.soulSpeedBoss == 1 and UnitExists("target") then
+		local targetMaxHealth = UnitHealthMax("target")
+		if targetMaxHealth and targetMaxHealth > 100000 then
+			-- 检查是否已有魂能之速buff
+			if not AC.Lib.Buff("魂能之速") then
+				-- 使用魂能之速
+				AC.Lib.UseItemByName("魂能之速")
+				self:DebugPrint("Boss战中使用魂能之速")
+			end
+		end
+	end
+
 	-- OT处理：当成为怪物攻击目标时的应对策略
 	if combat and UnitExists("target") and UnitExists("targettarget") and UnitIsUnit("player", "targettarget") then
 		local targetMaxHealth = UnitHealthMax("target")
