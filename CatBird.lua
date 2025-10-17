@@ -195,22 +195,18 @@ function Bird:CastAll()
 	self:EnsureCorrectForm()
 
 	-- Boss战中使用魂能之速
-	if combat and AC.Options.soulSpeedBoss == 1 and UnitExists("target") then
-		local targetMaxHealth = UnitHealthMax("target")
-		if targetMaxHealth and targetMaxHealth > 100000 then
-			-- 检查是否已有魂能之速buff
-			if not AC.Lib.Buff("魂能之速") then
-				-- 使用魂能之速
-				AC.Lib.UseItemByName("魂能之速")
-				self:DebugPrint("Boss战中使用魂能之速")
-			end
+	if combat and AC.Options.soulSpeedBoss == 1 and AC.Lib.IsBossTarget() then
+		-- 检查是否已有魂能之速buff
+		if not AC.Lib.Buff("魂能之速") then
+			-- 使用魂能之速
+			AC.Lib.UseItemByName("魂能之速")
+			self:DebugPrint("Boss战中使用魂能之速")
 		end
 	end
 
 	-- OT处理：当成为怪物攻击目标时的应对策略
 	if combat and UnitExists("target") and UnitExists("targettarget") and UnitIsUnit("player", "targettarget") then
-		local targetMaxHealth = UnitHealthMax("target")
-		if targetMaxHealth > 100000 then -- Boss判断
+		if AC.Lib.IsBossTarget() then -- Boss判断
 			if AC.Options.bird.combat.otInvulnerability then
 				local hasLimitedInvulBuff = AC.Lib.Buff("无敌")
 				if not hasLimitedInvulBuff then
@@ -240,10 +236,60 @@ function Bird:CastAll()
 		AC.Lib.UseItemByName("诺达纳尔草药茶")
 	end
 
-
+	-- 鸟德法力管理：激活、草药茶/符文
+	-- 1. 激活逻辑：确保给自己使用
+	if AC.Options.bird.mana.autoActivate then
+		if mana < AC.Options.bird.mana.activateValue and AC.Lib.SpellReady("激活") then
+			-- 保存当前目标
+			local currentTargetName = UnitName("target")
+			-- 目标自己使用激活
+			TargetUnit("player")
+			CastSpellByName("激活")
+			self:DebugPrint("法力不足(%d < %d)，对自己使用激活", mana, AC.Options.bird.mana.activateValue)
+			-- 恢复之前的目标
+			if currentTargetName then
+				TargetByName(currentTargetName)
+			else
+				ClearTarget()
+			end
+			return
+		end
+	end
+	
+	-- 2. 草药茶/符文逻辑（根据血量条件选择）
+	if AC.Options.bird.mana.consumable then
+		if mana < AC.Options.bird.mana.consumableValue then
+			local health = UnitHealth("player")
+			local maxHealth = UnitHealthMax("player")
+			local healthPercent = (health / maxHealth) * 100
+			
+			if healthPercent < 50 then
+				-- 血量低于50%，使用草药茶
+				AC.Lib.UseItemByName("诺达纳尔草药茶")
+				self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用草药茶", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+			else
+				-- 血量>=50%，优先使用恶魔符文，没有则用黑暗符文，如果都没有则用草药茶
+				if AC.Lib.UseItemByName("恶魔符文") then
+					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用恶魔符文", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+				elseif AC.Lib.UseItemByName("黑暗符文") then
+					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，使用黑暗符文", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+				else
+					-- 没有符文，回退到草药茶
+					AC.Lib.UseItemByName("诺达纳尔草药茶")
+					self:DebugPrint("法力不足(%d < %d)，血量%.1f%%，无符文可用，使用草药茶", mana, AC.Options.bird.mana.consumableValue, healthPercent)
+				end
+			end
+			-- 注意：这里不return，继续往下走
+		end
+	end
 
 	-- 鸟德攻击流程
-	self:BirdCombatFlow()
+	-- 根据设置选择战斗模式
+	if AC.Options.bird.combat.trashOnlyMoonfireWrath and AC.Lib.IsTrashTarget() then
+		self:BirdTrashCombatFlow()
+	else
+		self:BirdCombatFlow()
+	end
 end
 
 -- 确保在正确的形态下（枭兽形态优先，否则人类形态）
@@ -375,18 +421,7 @@ function Bird:BirdCombatFlow()
 		return false
 	end
 	
-	-- DruidBird斩杀逻辑：目标生命小于等于设定百分比时
-	if targetHealthPercent > 0 and targetHealthPercent <= AC.Options.bird.combat.executeThreshold then
-		if hasBalance then
-			-- 有万物平衡，打星火术（愤怒有弹道时间）
-			CastSpellByName("星火术")
-			self:DebugPrint("斩杀阶段+万物平衡：星火术")
-		else
-			CastSpellByName("愤怒")
-			self:DebugPrint("斩杀阶段：愤怒")
-		end
-		return
-	end
+	-- 斩杀逻辑已移除，等待下一步指示
 	
 	-- 法力管理：激活、草药茶/符文
 	-- 1. 激活逻辑：确保给自己使用
@@ -465,23 +500,23 @@ function Bird:BirdCombatFlow()
 	local hasLunarEclipse = AC.Lib.Buff("月蚀")
 	
 	if hasSolarEclipse then
-		local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
-		-- 计算星火术实际施法时间(考虑buff减免)
-		local wrathCastTime = 1.5  -- 基础施法时间
+		-- local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
+		-- -- 计算星火术实际施法时间(考虑buff减免)
+		-- local wrathCastTime = 1.5  -- 基础施法时间
 		
-		-- 检查自然恩典buff(减少0.5秒)
-		if AC.Lib.Buff("自然恩典") then
-			wrathCastTime = wrathCastTime - 0.5
-		end
+		-- -- 检查自然恩典buff(减少0.5秒)
+		-- if AC.Lib.Buff("自然恩典") then
+		-- 	wrathCastTime = wrathCastTime - 0.5
+		-- end
 		
 		
-		-- 如果日蚀剩余时间不够打星火术，直接补虫群
-		if solarTimeLeft and solarTimeLeft < wrathCastTime then
-			CastSpellByName("虫群")
-			AC.Event.lastSwarmTime = GetTime()
-			self:DebugPrint("日蚀剩余%.1f秒(<%.1f)，直接补虫群", solarTimeLeft, wrathCastTime)
-			return
-		end
+		-- -- 如果日蚀剩余时间不够打星火术，直接补虫群
+		-- if solarTimeLeft and solarTimeLeft < wrathCastTime then
+		-- 	CastSpellByName("虫群")
+		-- 	AC.Event.lastSwarmTime = GetTime()
+		-- 	self:DebugPrint("日蚀剩余%.1f秒(<%.1f)，直接补虫群", solarTimeLeft, wrathCastTime)
+		-- 	return
+		-- end
 		
 		-- 日蚀期间专注愤怒
 		CastSpellByName("愤怒")
@@ -490,27 +525,27 @@ function Bird:BirdCombatFlow()
 	end
 	
 	if hasLunarEclipse then
-		local lunarTimeLeft = self:GetBuffTimeLeft("月蚀")
-		-- 计算星火术实际施法时间(考虑buff减免)
-		local starfireCastTime = 3.0  -- 基础施法时间
+		-- local lunarTimeLeft = self:GetBuffTimeLeft("月蚀")
+		-- -- 计算星火术实际施法时间(考虑buff减免)
+		-- local starfireCastTime = 3.0  -- 基础施法时间
 
-		-- 检查自然恩典buff(减少0.5秒)
-		if AC.Lib.Buff("自然恩典") then
-			starfireCastTime = starfireCastTime - 0.5
-		end
+		-- -- 检查自然恩典buff(减少0.5秒)
+		-- if AC.Lib.Buff("自然恩典") then
+		-- 	starfireCastTime = starfireCastTime - 0.5
+		-- end
 		
-		-- 检查万物平衡buff(减少0.5秒)
-		if AC.Lib.Buff("万物平衡") then
-			starfireCastTime = starfireCastTime - 0.5
-		end
+		-- -- 检查万物平衡buff(减少0.5秒)
+		-- if AC.Lib.Buff("万物平衡") then
+		-- 	starfireCastTime = starfireCastTime - 0.5
+		-- end
 		
-		-- 月蚀最后1.5秒，直接补月火
-		if lunarTimeLeft and lunarTimeLeft <= starfireCastTime then
-			CastSpellByName("月火术")
-			AC.Event.lastMoonfireTime = GetTime()
-			self:DebugPrint("月蚀剩余%.1f秒，直接补月火", lunarTimeLeft)
-			return
-		end
+		-- -- 月蚀最后1.5秒，直接补月火
+		-- if lunarTimeLeft and lunarTimeLeft <= starfireCastTime then
+		-- 	CastSpellByName("月火术")
+		-- 	AC.Event.lastMoonfireTime = GetTime()
+		-- 	self:DebugPrint("月蚀剩余%.1f秒，直接补月火", lunarTimeLeft)
+		-- 	return
+		-- end
 		
 		-- 月蚀期间专注星火术
 		CastSpellByName("星火术")
@@ -574,6 +609,57 @@ function Bird:BirdCombatFlow()
 		end
 		return
 	end
+end
+
+
+-- 小怪战斗流程（只使用月火术和愤怒）
+function Bird:BirdTrashCombatFlow()
+	local targetHealth = UnitHealth("target")
+	local targetMaxHealth = UnitHealthMax("target")
+	local targetHealthPercent = 0
+	if targetMaxHealth and targetMaxHealth > 0 then
+		targetHealthPercent = (targetHealth / targetMaxHealth) * 100
+	end
+	
+	-- 没有目标时不继续
+	if not UnitExists("target") then
+		return
+	end
+	
+	-- 使用AutoCat的DOT状态检查
+	local moonfire = AC.Event.GetMoonfireDot()
+	
+	self:DebugPrint("小怪战斗流程：目标血量%.1f%%，月火：%s", 
+		targetHealthPercent, tostring(not not moonfire))
+	
+	-- 可否减益函数（只检查月火术）
+	local function CanDebuff(name)
+		if name == "月火术" then
+			return not moonfire
+		end
+		return false
+	end
+	
+	-- 奥术免疫检查：如果目标奥术免疫，只使用愤怒（自然伤害）
+	if AC.Config.targetArcaneImmune then
+		CastSpellByName("愤怒")
+		self:DebugPrint("目标奥术免疫：只使用愤怒")
+		return
+	end
+
+	-- 小怪战斗逻辑：只使用月火术和愤怒
+	-- 1. DOT维护（最高优先级）
+	-- 月火没了补月火
+	if CanDebuff("月火术") then
+		CastSpellByName("月火术")
+		AC.Event.lastMoonfireTime = GetTime()
+		self:DebugPrint("补月火术")
+		return
+	end
+
+	-- 2. 主要攻击：只使用愤怒
+	CastSpellByName("愤怒")
+	self:DebugPrint("小怪模式：愤怒")
 end
 
 -- 所有状态检查都使用现有的AC.Lib.Buff系统

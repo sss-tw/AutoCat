@@ -106,7 +106,7 @@ local defaultConfig = {
 		-- 战斗设置
 		combat = {
 			otInvulnerability = true,    -- OT吃有限无敌
-			executeThreshold = 19,       -- 斩杀阈值（百分比）
+			trashOnlyMoonfireWrath = false,  -- 小怪只打月火愤怒
 		},
 		-- 法力管理设置
 		mana = {
@@ -362,17 +362,14 @@ function Cat:OnInitialize()
 							self:ApplyConfig()
 						end
 					},
-					execute_threshold = {
-						type = "range",
-						name = "斩杀阈值",
-						desc = "目标血量低于该百分比时优先使用愤怒进行斩杀",
+					trash_only_moonfire_wrath = {
+						type = "toggle",
+						name = "小怪只打月火愤怒",
+						desc = "当目标为小怪时只使用月火术和愤怒，不使用其他技能",
 						order = 3,
-						min = 0,
-						max = 100,
-						step = 1,
-						get = function() return self.db.profile.bird.combat.executeThreshold end,
+						get = function() return self.db.profile.bird.combat.trashOnlyMoonfireWrath end,
 						set = function(value) 
-							self.db.profile.bird.combat.executeThreshold = value
+							self.db.profile.bird.combat.trashOnlyMoonfireWrath = value
 							self:ApplyConfig()
 						end
 					},
@@ -1000,7 +997,7 @@ function Cat:ApplyConfig()
     AutoCat.Options.bird = {
         combat = {
             otInvulnerability = self.db.profile.bird.combat.otInvulnerability,
-            executeThreshold = self.db.profile.bird.combat.executeThreshold
+            trashOnlyMoonfireWrath = self.db.profile.bird.combat.trashOnlyMoonfireWrath
         },
         mana = {
             autoActivate = self.db.profile.bird.mana.autoActivate,

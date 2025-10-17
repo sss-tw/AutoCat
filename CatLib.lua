@@ -565,3 +565,41 @@ function AC.Lib.IsTargetInRange()
 	end
 end
 
+-- 统一的目标类型判断函数
+function AC.Lib.GetTargetType()
+	if not UnitExists("target") then
+		return "none"
+	end
+	
+	local targetMaxHealth = UnitHealthMax("target")
+	
+	-- 统一判断标准：世界Boss或血量大于等于100000的为Boss，其他都是小怪
+	local classification = UnitClassification("target")
+	local isWorldBoss = classification == "worldboss"
+	
+	-- 如果没有血量信息，只检查是否为世界Boss
+	if not targetMaxHealth then
+		if isWorldBoss then
+			return "boss"
+		else
+			return "trash"  -- 无法获取血量信息的目标默认为小怪
+		end
+	end
+	
+	if isWorldBoss or targetMaxHealth >= 100000 then
+		return "boss"
+	else
+		return "trash"
+	end
+end
+
+-- 判断目标是否为小怪
+function AC.Lib.IsTrashTarget()
+	return AC.Lib.GetTargetType() == "trash"
+end
+
+-- 判断目标是否为Boss
+function AC.Lib.IsBossTarget()
+	return AC.Lib.GetTargetType() == "boss"
+end
+

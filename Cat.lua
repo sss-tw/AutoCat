@@ -41,6 +41,7 @@ local AC = AutoCat -- 简写以方便引用
 -- 初始化命名空间
 AC.Combat = AC.Combat or {} -- 战斗相关的函数
 
+
 -- 私有变量
 local lastLootTime = 0  -- 上次拾取时间
 
@@ -69,8 +70,7 @@ AutoCat.Run = function(type)
 
 	-- OT处理：当成为怪物攻击目标时的应对策略（简化版）
 	if combat and UnitExists("target") and UnitExists("targettarget") and UnitIsUnit("player", "targettarget") then
-		local targetMaxHealth = UnitHealthMax("target")
-		if targetMaxHealth > 100000 then
+		if AC.Lib.IsBossTarget() then
             local hasLimitedInvulBuff = AC.Lib.Buff("无敌")
             if hasLimitedInvulBuff then
                 -- 已有无敌buff，继续猫德攻击
@@ -106,8 +106,7 @@ AutoCat.Run = function(type)
 
 	-- Boss战中使用魂能之速（需要距离判断）
 	if combat and AC.Options.soulSpeedBoss == 1 and AC.Lib.IsTargetInRange() then
-		local targetMaxHealth = UnitHealthMax("target")
-		if targetMaxHealth and targetMaxHealth > 100000 then
+		if AC.Lib.IsBossTarget() then
 			-- 检查是否已有魂能之速buff
 			if not AC.Lib.Buff("魂能之速") then
 				-- 使用魂能之速
@@ -244,8 +243,8 @@ function AC.Combat.Bleed(useShapeshift)
     local dmMana = AC.Lib.DriudMana()
     local gcdLeft = AC.Lib.GetSpellCooldown("愤怒")
     local isStealthed = AC.Lib.Buff("潜行")
-    -- Boss判断：世界Boss或血量大于100000
-    local isBoss = UnitClassification("target") == "worldboss" or (targetMaxHealth and targetMaxHealth > 100000)
+    -- Boss判断：使用统一的目标类型判断
+    local isBoss = AC.Lib.IsBossTarget()
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
         -- 检查是否满足撕扯条件
