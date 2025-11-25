@@ -45,6 +45,38 @@ AC.Combat = AC.Combat or {} -- 战斗相关的函数
 -- 私有变量
 local lastLootTime = 0  -- 上次拾取时间
 
+-- 仇恨阈值畏缩处理
+local function HandleThreatCower(combat)
+	if AC.Options.cowerEnabled ~= 1 then
+		return false
+	end
+	if not combat then
+		return false
+	end
+	if type(TWTtargetThreat) ~= "function" then
+		return false
+	end
+	if not UnitExists("target") or not UnitCanAttack("player", "target") then
+		return false
+	end
+	if not AC.Lib.GetShape(3) then
+		return false
+	end
+	local myPerc = TWTtargetThreat("m")
+	if type(myPerc) ~= "number" then
+		return false
+	end
+	local thresholdPercent = tonumber(AC.Options.cowerThreshold) or 80
+	if Cat and Cat:IsDebugging() then
+		DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Cat Debug:|r 自身仇恨=%.0f%%，阈值=%.0f%%", myPerc, thresholdPercent))
+	end
+	if myPerc >= thresholdPercent and AC.Lib.SpellReady("畏缩") then
+		CastSpellByName("畏缩")
+		return true
+	end
+	return false
+end
+
 -- 主函数，作为AutoCat表的方法
 AutoCat.Run = function(type)
 
@@ -117,6 +149,9 @@ AutoCat.Run = function(type)
 			end
 		end
 	end
+
+	-- 仇恨接近OT时自动畏缩（在OT变熊逻辑之后执行）
+	HandleThreatCower(combat)
 
 	-- 确保在豹子形态下
 	if not AC.Lib.GetShape(3) then

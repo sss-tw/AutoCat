@@ -30,7 +30,9 @@ local defaultConfig = {
                 loot_interval = 0.5,    -- 自动拾取间隔时间（秒）
                 rend_threshold = 3000,  -- 撕扯使用阈值（目标血量高于此值时使用）
                 avoid_player_target = true,  -- 如果目标是玩家则停止攻击并切换目标
-                ot_bear_form = true  -- OT时自动变熊
+                ot_bear_form = true,  -- OT时自动变熊
+                cower_enabled = true, -- 仇恨超阈值时自动畏缩
+                cower_threshold = 80  -- 畏缩触发阈值（百分比）
         },
         -- 治疗设置
         healing = {
@@ -149,7 +151,9 @@ AutoCat.Options = {
 	rendValue = 3000,
 	singleCatMode = 1,
 	avoidPlayerTarget = 1,
-	rejuvRank = 6
+        rejuvRank = 6,
+        cowerEnabled = 1,
+        cowerThreshold = 80
 }
 
 -- 初始化
@@ -341,6 +345,33 @@ function Cat:OnInitialize()
 						get = function() return self.db.profile.combat.ot_bear_form end,
 						set = function(value) 
 							self.db.profile.combat.ot_bear_form = value
+							self:ApplyConfig()
+						end
+					},
+					cower_enabled = {
+						type = "toggle",
+						name = "快OT时畏缩",
+						desc = "启用后当仇恨百分比达到阈值时自动施放畏缩（需TWT威胁插件）",
+						order = 12,
+						hidden = function() return type(TWTtargetThreat) ~= "function" end,
+						get = function() return self.db.profile.combat.cower_enabled end,
+						set = function(value)
+							self.db.profile.combat.cower_enabled = value
+							self:ApplyConfig()
+						end
+					},
+					cower_threshold = {
+						type = "range",
+						name = "畏缩仇恨阈值",
+						desc = "仇恨百分比达到该值时尝试施放畏缩",
+						order = 13,
+						min = 50,
+						max = 110,
+						step = 1,
+						hidden = function() return type(TWTtargetThreat) ~= "function" end,
+						get = function() return self.db.profile.combat.cower_threshold end,
+						set = function(value)
+							self.db.profile.combat.cower_threshold = value
 							self:ApplyConfig()
 						end
 					}
@@ -958,6 +989,8 @@ function Cat:ApplyConfig()
 
     AutoCat.Options.avoidPlayerTarget = self.db.profile.combat.avoid_player_target and 1 or 0
     AutoCat.Options.otBearForm = self.db.profile.combat.ot_bear_form and 1 or 0
+    AutoCat.Options.cowerEnabled = self.db.profile.combat.cower_enabled and 1 or 0
+    AutoCat.Options.cowerThreshold = self.db.profile.combat.cower_threshold or 80
     
     -- 饰品设置
     AutoCat.Options.trinketUpper = self.db.profile.trinket.upper and 1 or 0
