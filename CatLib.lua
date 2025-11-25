@@ -242,52 +242,67 @@ function AC.Lib.DriudMana()
 	return AC.Config.manaValue
 end
 
--- 使用背包中物品
-function AC.Lib.UseItemByName(itemName)
-	local bag, slot
+-- 查找背包中的物品（内部函数，返回bag和slot）
+local function FindItemInBag(itemName)
     for bag = 0, 4 do
         for slot = 1, GetContainerNumSlots(bag) do
             local itemLink = GetContainerItemLink(bag, slot)
             if itemLink then
                 local _, _, name = string.find(itemLink, "%[(.-)%]")
                 if name == itemName then
-                    -- 创建隐藏的tooltip用于扫描物品描述
-                    if not AC.ItemScanTooltip then
-                        AC.ItemScanTooltip = CreateFrame("GameTooltip", "AutoCatItemScanTooltip", nil, "GameTooltipTemplate")
-                        AC.ItemScanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
-                    end
-                    
-                    -- 清除之前的内容并设置当前物品
-                    AC.ItemScanTooltip:ClearLines()
-                    AC.ItemScanTooltip:SetBagItem(bag, slot)
-                    
-                    -- 扫描tooltip文本查找冷却时间相关字样
-                    local hasCooldownRemaining = false
-                    for i = 1, AC.ItemScanTooltip:NumLines() do
-                        local line = getglobal("AutoCatItemScanTooltipTextLeft" .. i)
-                        if line and line:GetText() then
-                            local text = line:GetText()
-                            -- 检查是否包含冷却时间相关字样
-                            if text and (strfind(text, "冷却时间剩余") or strfind(text, "冷却时间：")) then
-                                hasCooldownRemaining = true
-                                break
-                            end
-                        end
-                    end
-                    
-                    -- 如果有冷却时间剩余，不使用物品并返回false
-                    if hasCooldownRemaining then
-                        return false
-                    end
-                    
-                    -- 没有冷却时间剩余，正常使用物品
-                    UseContainerItem(bag, slot)
-                    return true
+                    return bag, slot
                 end
             end
         end
     end
-    return false
+    return nil, nil
+end
+
+-- 检查物品是否在背包中
+function AC.Lib.HasItemInBag(itemName)
+	local bag, slot = FindItemInBag(itemName)
+	return bag ~= nil
+end
+
+-- 使用背包中物品
+function AC.Lib.UseItemByName(itemName)
+	local bag, slot = FindItemInBag(itemName)
+	if not bag then
+		return false
+	end
+	
+	-- 创建隐藏的tooltip用于扫描物品描述
+	if not AC.ItemScanTooltip then
+		AC.ItemScanTooltip = CreateFrame("GameTooltip", "AutoCatItemScanTooltip", nil, "GameTooltipTemplate")
+		AC.ItemScanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+	end
+	
+	-- 清除之前的内容并设置当前物品
+	AC.ItemScanTooltip:ClearLines()
+	AC.ItemScanTooltip:SetBagItem(bag, slot)
+	
+	-- 扫描tooltip文本查找冷却时间相关字样
+	local hasCooldownRemaining = false
+	for i = 1, AC.ItemScanTooltip:NumLines() do
+		local line = getglobal("AutoCatItemScanTooltipTextLeft" .. i)
+		if line and line:GetText() then
+			local text = line:GetText()
+			-- 检查是否包含冷却时间相关字样
+			if text and (strfind(text, "冷却时间剩余") or strfind(text, "冷却时间：")) then
+				hasCooldownRemaining = true
+				break
+			end
+		end
+	end
+	
+	-- 如果有冷却时间剩余，不使用物品并返回false
+	if hasCooldownRemaining then
+		return false
+	end
+	
+	-- 没有冷却时间剩余，正常使用物品
+	UseContainerItem(bag, slot)
+	return true
 end
 
 -- 德鲁伊刷新特性状态

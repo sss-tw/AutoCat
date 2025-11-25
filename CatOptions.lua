@@ -107,6 +107,7 @@ local defaultConfig = {
 		combat = {
 			otInvulnerability = true,    -- OT吃有限无敌
 			trashOnlyMoonfireWrath = false,  -- 小怪只打月火愤怒
+			idol_dance = true,           -- 是否自动使用神像舞
 		},
 		-- 法力管理设置
 		mana = {
@@ -370,6 +371,17 @@ function Cat:OnInitialize()
 						get = function() return self.db.profile.bird.combat.trashOnlyMoonfireWrath end,
 						set = function(value) 
 							self.db.profile.bird.combat.trashOnlyMoonfireWrath = value
+							self:ApplyConfig()
+						end
+					},
+					idol_dance = {
+						type = "toggle",
+						name = "自动切换神像",
+						desc = "月火切月光，星火切潮汐，传播卡cd所以不切",
+						order = 4,
+						get = function() return self.db.profile.bird.combat.idol_dance end,
+						set = function(value) 
+							self.db.profile.bird.combat.idol_dance = value
 							self:ApplyConfig()
 						end
 					},
@@ -997,7 +1009,8 @@ function Cat:ApplyConfig()
     AutoCat.Options.bird = {
         combat = {
             otInvulnerability = self.db.profile.bird.combat.otInvulnerability,
-            trashOnlyMoonfireWrath = self.db.profile.bird.combat.trashOnlyMoonfireWrath
+            trashOnlyMoonfireWrath = self.db.profile.bird.combat.trashOnlyMoonfireWrath,
+            idolDance = self.db.profile.bird.combat.idol_dance and 1 or 0
         },
         mana = {
             autoActivate = self.db.profile.bird.mana.autoActivate,

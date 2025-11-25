@@ -165,6 +165,62 @@ function Bird:OnLeaveCombat()
 	-- 可在此添加离开战斗的逻辑
 end
 
+-- 神像舞：根据下一个技能装备相应的神像
+-- nextSpell: 下一个要释放的技能名称（"月火术"、"虫群"、"星火术"）
+-- 注意：此函数在战斗和非战斗状态下都可以使用
+function Bird:EquipIdolForSpell(nextSpell)
+	-- 检查是否启用了神像舞
+	if not AC.Options.bird.combat.idolDance or AC.Options.bird.combat.idolDance == 0 then
+		return false
+	end
+	
+	-- 检查是否在战斗中
+	local inCombat = UnitAffectingCombat("player")
+	
+	-- 如果在战斗中，需要检查GCD剩余时间
+	if inCombat then
+		-- 检查GCD剩余时间，只有GCD剩余时间大于1.2秒时才换神像
+		-- 使用愤怒技能来检测GCD（愤怒是瞬发技能，如果没有独立CD，其冷却就是GCD）
+		local gcdRemaining = AC.Lib.GetSpellCooldown("月火术")
+		-- 如果GCD剩余时间小于等于1.2秒，不换神像
+		if gcdRemaining > 0 and gcdRemaining <= 1.2 then
+			-- GCD剩余时间不足1.2秒，不换神像
+			return false
+		end
+	end
+	-- 如果不在战斗中，无视GCD，总是可以换神像
+	
+	-- 技能到神像的映射
+	local spellToIdol = {
+		["月火术"] = "月亮神像",
+		--["虫群"] = "传播神像",
+		["星火术"] = "潮汐神像"
+	}
+	
+	local idolName = spellToIdol[nextSpell]
+	if not idolName then
+		-- 未知技能，不装备神像
+		return false
+	end
+	
+	-- 检查神像是否在背包中
+	-- if not AC.Lib.HasItemInBag(idolName) then
+	-- 	self:DebugPrint("神像舞：背包中没有%s", idolName)
+	-- 	return false
+	-- end
+	
+	-- 检查是否已经装备了该神像
+	if AC.Lib.CheckInventoryItemName(18, idolName) then
+		-- 已经装备了，不做动作
+		return false
+	end
+	
+	-- 装备神像
+	UseItemByName(idolName)
+	self:DebugPrint("神像舞：为技能%s装备%s", nextSpell, idolName)
+	return true
+end
+
 -- 鸟德主要战斗循环
 function Bird:CastAll()
 	-- 获取基础状态信息
@@ -481,6 +537,8 @@ function Bird:BirdCombatFlow()
 	-- 1. DOT维护（最高优先级）
 	-- 虫群没了补虫群
 	if CanDebuff("虫群") then
+		-- 神像舞：装备传播神像
+		self:EquipIdolForSpell("虫群")
 		CastSpellByName("虫群")
 		AC.Event.lastSwarmTime = GetTime()
 		self:DebugPrint("补虫群")
@@ -489,6 +547,8 @@ function Bird:BirdCombatFlow()
 	
 	-- 月火没了补月火
 	if CanDebuff("月火术") then
+		-- 神像舞：装备月亮神像
+		self:EquipIdolForSpell("月火术")
 		CastSpellByName("月火术")
 		AC.Event.lastMoonfireTime = GetTime()
 		self:DebugPrint("补月火术")
@@ -518,7 +578,7 @@ function Bird:BirdCombatFlow()
 		-- 	return
 		-- end
 		
-		-- 日蚀期间专注愤怒
+		-- 日蚀期间专注愤怒（愤怒不需要神像）
 		CastSpellByName("愤怒")
 		self:DebugPrint("日蚀：愤怒(剩余%.1f秒)", solarTimeLeft or 0)
 		return
@@ -548,6 +608,8 @@ function Bird:BirdCombatFlow()
 		-- end
 		
 		-- 月蚀期间专注星火术
+		-- 神像舞：装备潮汐神像
+		self:EquipIdolForSpell("星火术")
 		CastSpellByName("星火术")
 		self:DebugPrint("月蚀：星火术(剩余%.1f秒)", lunarTimeLeft or 0)
 		return
@@ -573,6 +635,8 @@ function Bird:BirdCombatFlow()
 	
 	-- 4. 昼至状态下打星火术
 	if hasDayfall and not hasNightfall then
+		-- 神像舞：装备潮汐神像
+		self:EquipIdolForSpell("星火术")
 		CastSpellByName("星火术")
 		self:DebugPrint("昼至状态：星火术")
 		return
@@ -580,6 +644,7 @@ function Bird:BirdCombatFlow()
 	
 	-- 5. 夜至状态下打愤怒
 	if hasNightfall and not hasDayfall then
+		-- 愤怒不需要神像
 		CastSpellByName("愤怒")
 		self:DebugPrint("夜至状态：愤怒")
 		return
@@ -592,18 +657,22 @@ function Bird:BirdCombatFlow()
 		
 		if hasNatureBlessing and hasBalance then
 			-- 都有：打星火
+			-- 神像舞：装备潮汐神像
+			self:EquipIdolForSpell("星火术")
 			CastSpellByName("星火术")
 			self:DebugPrint("自然之赐+万物平衡：星火术")
 		elseif hasNatureBlessing and not hasBalance then
-			-- 只有自然之赐：打愤怒
+			-- 只有自然之赐：打愤怒（不需要神像）
 			CastSpellByName("愤怒")
 			self:DebugPrint("自然之赐：愤怒")
 		elseif not hasNatureBlessing and hasBalance then
 			-- 只有万物平衡：打星火
+			-- 神像舞：装备潮汐神像
+			self:EquipIdolForSpell("星火术")
 			CastSpellByName("星火术")
 			self:DebugPrint("万物平衡：星火术")
 		else
-			-- 都没有：打愤怒
+			-- 都没有：打愤怒（不需要神像）
 			CastSpellByName("愤怒")
 			self:DebugPrint("无buff：愤怒")
 		end
@@ -651,13 +720,15 @@ function Bird:BirdTrashCombatFlow()
 	-- 1. DOT维护（最高优先级）
 	-- 月火没了补月火
 	if CanDebuff("月火术") then
+		-- 神像舞：装备月亮神像
+		self:EquipIdolForSpell("月火术")
 		CastSpellByName("月火术")
 		AC.Event.lastMoonfireTime = GetTime()
 		self:DebugPrint("补月火术")
 		return
 	end
 
-	-- 2. 主要攻击：只使用愤怒
+	-- 2. 主要攻击：只使用愤怒（不需要神像）
 	CastSpellByName("愤怒")
 	self:DebugPrint("小怪模式：愤怒")
 end
