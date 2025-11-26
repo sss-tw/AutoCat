@@ -59,6 +59,14 @@ local function HandleThreatCower(combat)
 	if not UnitExists("target") or not UnitCanAttack("player", "target") then
 		return false
 	end
+	-- 必须在团队中
+	if GetNumRaidMembers() == 0 then
+		return false
+	end
+	-- 目标血量必须大于10万
+	if UnitHealthMax("target") <= 100000 then
+		return false
+	end
 	if not AC.Lib.GetShape(3) then
 		return false
 	end
