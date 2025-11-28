@@ -385,6 +385,7 @@ function AC.Combat.Bleed(useShapeshift)
     if dmMana >= AC.Config.shapeshiftMana and gcdLeft < 0.05 and
        not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
        not AC.Lib.Buff("自然变形") and
+       not AC.Lib.Buff("裂隙诅咒") and
        (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.tigerFuryTimer and GetTime() - AC.Combat.tigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
         if useShapeshift then
             CastSpellByName("重整")
@@ -489,6 +490,7 @@ function AC.Combat.Backstab()
     if dmMana >= AC.Config.shapeshiftMana and energyConserve < 1.7
        and not AC.Lib.Buff("狂暴") and not hasPredatorReveal
        and not AC.Lib.Buff("自然变形")
+       and not AC.Lib.Buff("裂隙诅咒")
        and myPower < AC.Config.tearEnergy - 20 then
         CastSpellByName("重整")
     end
@@ -597,6 +599,7 @@ function AC.Combat.RendBleed()
     if dmMana >= AC.Config.shapeshiftMana and
         not AC.Lib.Buff("狂暴") and not hasPredatorReveal and
         not AC.Lib.Buff("自然变形") and
+        not AC.Lib.Buff("裂隙诅咒") and
         (myPower < AC.Config.clawEnergy - 24 or (AC.Combat.rendBleedTigerFuryTimer and GetTime() - AC.Combat.rendBleedTigerFuryTimer > 10 and myPower < AC.Config.rakeEnergy)) then
         CastSpellByName("重整")
         return
