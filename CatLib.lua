@@ -514,6 +514,7 @@ local arcaneImmuneList = {
     ["不稳定的奥术元素"] = true,
     ["破碎的奥术元素"] = true,
     ["阿诺玛鲁斯"] = true,
+    ["自然亲和"] = true,
 }
 
 -- 检验单位能否流血

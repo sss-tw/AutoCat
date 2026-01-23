@@ -219,6 +219,20 @@ AutoCat.Run = function(type)
 		return
 	end
 
+	-- 精灵火开怪：如果有目标、目标身上没有精灵火、不在攻击范围内、精灵火没有CD
+	if AC.Options.faerieFirePull == 1 and UnitExists("target") and UnitCanAttack("player", "target") then
+		local isInRange = AC.Lib.IsTargetInRange()
+		if not AC.Lib.Buff("精灵之火（野性）", "target") and 
+		   not isInRange and 
+		   AC.Lib.SpellReady("精灵之火（野性）") then
+			CastSpellByName("精灵之火（野性）")
+			if Cat and Cat:IsDebugging() then
+				DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r 使用精灵火开怪")
+			end
+			return
+		end
+	end
+
 	-- 开启自动攻击
 	AC.Lib.StartAttack()
 
@@ -291,8 +305,8 @@ function AC.Combat.Bleed(useShapeshift)
     -- 神像选择逻辑
     if AC.Options.idolDance == 1 then
         -- 检查是否满足撕扯条件
-        local shouldRip = (not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal)) or
-                         (not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal))
+        local shouldRip = (not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal)) or
+                         (not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal))
         
         -- 检查是否满足扫击条件
         local shouldRake = not rakeDot and (myPower >= AC.Config.rakeEnergy or hasPredatorReveal) and not AC.Lib.Buff("血袭")
@@ -338,14 +352,14 @@ function AC.Combat.Bleed(useShapeshift)
     end
 
     -- 补撕扯（5星）
-    if not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal) then
+    if not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal) then
         CastSpellByName("撕扯")
         AC.Combat.t1 = GetTime()
         return
     end
 
     -- 非Boss目标1星撕扯
-    if not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal) then
+    if not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal) then
         CastSpellByName("撕扯")
         AC.Combat.t1 = GetTime()
         return
@@ -515,6 +529,7 @@ function AC.Combat.RendBleed()
     
     -- 获取当前状态
     local targetHealth = UnitHealth("target")
+    local targetMaxHealth = UnitHealthMax("target")
     -- 使用AutoCat的DOT检测系统
     local rakeDot = AC.Event.GetRakeDot()
     local ripDot = AC.Event.GetRipDot()
@@ -559,7 +574,7 @@ function AC.Combat.RendBleed()
     end
     
     -- 补撕扯
-    if not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and (myPower >= 30 or hasPredatorReveal) then
+    if not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal) then
         CastSpellByName("撕扯")
         AC.Combat.rendBleedT1 = GetTime()
         return

@@ -24,6 +24,7 @@ local defaultConfig = {
                 use_unitxp = true,      -- 是否开启UnitXP，用于强化判断正反面
                 tiger_fury = true,      -- 是否保持猛虎之怒
                 faerie_fire = true,     -- 是否自动补精灵之火
+                faerie_fire_pull = false,  -- 是否使用精灵火开怪
                 auto_pounce = true,     -- 是否自动使用突袭
                 idol_dance = true,      -- 是否自动使用神像舞
                 auto_loot = true,       -- 是否启用自动拾取
@@ -144,6 +145,7 @@ AutoCat.Options = {
 	otLimitedInvulnerability = 0,
 	tigerFury = 1,
 	faerieFire = 1,
+	faerieFirePull = 0,
 	pounce = 1,
 	idolDance = 1,
 	loot = 0,
@@ -264,11 +266,22 @@ function Cat:OnInitialize()
 							self:ApplyConfig()
 						end
 					},
+					faerie_fire_pull = {
+						type = "toggle",
+						name = "精灵火开怪",
+						desc = "是否使用精灵火开怪",
+						order = 5,
+						get = function() return self.db.profile.combat.faerie_fire_pull end,
+						set = function(value) 
+							self.db.profile.combat.faerie_fire_pull = value
+							self:ApplyConfig()
+						end
+					},
 					auto_pounce = {
 						type = "toggle",
 						name = "自动使用突袭",
 						desc = "潜行状态下是否自动使用突袭",
-						order = 5,
+						order = 6,
 						get = function() return self.db.profile.combat.auto_pounce end,
 						set = function(value) 
 							self.db.profile.combat.auto_pounce = value
@@ -279,7 +292,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "自动装备撕裂神像",
 						desc = "是否自动装备撕裂神像",
-						order = 6,
+						order = 7,
 						get = function() return self.db.profile.combat.idol_dance end,
 						set = function(value) 
 							self.db.profile.combat.idol_dance = value
@@ -290,7 +303,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "自动拾取（自用！别选）",
 						desc = "是否启用自动拾取功能",
-						order = 7,
+						order = 8,
 						get = function() return self.db.profile.combat.auto_loot end,
 						set = function(value) 
 							self.db.profile.combat.auto_loot = value
@@ -301,7 +314,7 @@ function Cat:OnInitialize()
 						type = "range",
 						name = "拾取间隔",
 						desc = "自动拾取间隔时间（秒）",
-						order = 8,
+						order = 9,
 						min = 0.1,
 						max = 10,
 						step = 0.1,
@@ -315,7 +328,7 @@ function Cat:OnInitialize()
 						type = "range",
 						name = "撕扯使用阈值",
 						desc = "撕扯使用阈值（目标血量高于此值时使用）",
-						order = 9,
+						order = 10,
 						min = 500,
 						max = 3000,
 						step = 100,
@@ -330,7 +343,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "避免攻击玩家",
 						desc = "如果目标是玩家则停止攻击并切换目标",
-						order = 10,
+						order = 11,
 						get = function() return self.db.profile.combat.avoid_player_target end,
 						set = function(value) 
 							self.db.profile.combat.avoid_player_target = value
@@ -341,7 +354,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "OT时变熊",
 						desc = "当OT时自动变熊形态并使用熊德攻击逻辑（不会嘲讽）",
-						order = 11,
+						order = 12,
 						get = function() return self.db.profile.combat.ot_bear_form end,
 						set = function(value) 
 							self.db.profile.combat.ot_bear_form = value
@@ -352,7 +365,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "快OT时畏缩",
 						desc = "启用后当仇恨百分比达到阈值时自动施放畏缩（需TWT威胁插件）",
-						order = 12,
+						order = 13,
 						hidden = function() return type(TWTtargetThreat) ~= "function" end,
 						get = function() return self.db.profile.combat.cower_enabled end,
 						set = function(value)
@@ -364,7 +377,7 @@ function Cat:OnInitialize()
 						type = "range",
 						name = "畏缩仇恨阈值",
 						desc = "仇恨百分比达到该值时尝试施放畏缩",
-						order = 13,
+						order = 14,
 						min = 50,
 						max = 110,
 						step = 1,
@@ -981,6 +994,7 @@ function Cat:ApplyConfig()
     AutoCat.Options.useUnitXP = self.db.profile.combat.use_unitxp and 1 or 0
     AutoCat.Options.tigerFury = self.db.profile.combat.tiger_fury and 1 or 0
     AutoCat.Options.faerieFire = self.db.profile.combat.faerie_fire and 1 or 0
+    AutoCat.Options.faerieFirePull = self.db.profile.combat.faerie_fire_pull and 1 or 0
     AutoCat.Options.pounce = self.db.profile.combat.auto_pounce and 1 or 0
     AutoCat.Options.idolDance = self.db.profile.combat.idol_dance and 1 or 0
     AutoCat.Options.loot = self.db.profile.combat.auto_loot and 1 or 0
