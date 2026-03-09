@@ -112,6 +112,12 @@ local defaultConfig = {
 			trashOnlyMoonfireWrath = false,  -- 小怪只打月火愤怒
 			idol_dance = true,           -- 是否自动使用神像舞
 		},
+		-- AOE设置（手动飓风连招）
+		aoe = {
+			usePotion = true,            -- 是否尝试使用有限无敌药水
+			trinketUpper = true,         -- 是否尝试使用上饰品
+			trinketBelow = true,         -- 是否尝试使用下饰品
+		},
 		-- 法力管理设置
 		mana = {
 			autoActivate = true,         -- 自动使用激活
@@ -429,16 +435,54 @@ function Cat:OnInitialize()
 							self:ApplyConfig()
 						end
 					},
+					aoe_header = {
+						type = "header",
+						name = "AOE设置（指向鼠标施放飓风）",
+						order = 5,
+					},
+					aoe_use_potion = {
+						type = "toggle",
+						name = "AOE尝试吃药",
+						desc = "执行 /autobirdhurricane 或 /abhe 时尝试使用有限无敌药水",
+						order = 6,
+						get = function() return self.db.profile.bird.aoe.usePotion end,
+						set = function(value)
+							self.db.profile.bird.aoe.usePotion = value
+							self:ApplyConfig()
+						end
+					},
+					aoe_trinket_upper = {
+						type = "toggle",
+						name = "AOE使用上饰品",
+						desc = "执行 /autobirdhurricane 或 /abhe 时尝试使用上部饰品",
+						order = 7,
+						get = function() return self.db.profile.bird.aoe.trinketUpper end,
+						set = function(value)
+							self.db.profile.bird.aoe.trinketUpper = value
+							self:ApplyConfig()
+						end
+					},
+					aoe_trinket_below = {
+						type = "toggle",
+						name = "AOE使用下饰品",
+						desc = "执行 /autobirdhurricane 或 /abhe 时尝试使用下部饰品",
+						order = 8,
+						get = function() return self.db.profile.bird.aoe.trinketBelow end,
+						set = function(value)
+							self.db.profile.bird.aoe.trinketBelow = value
+							self:ApplyConfig()
+						end
+					},
 					mana_header = {
 						type = "header",
 						name = "法力管理",
-						order = 6,
+						order = 9,
 					},
 					auto_activate = {
 						type = "toggle",
 						name = "自动使用激活",
 						desc = "法力不足时自动使用激活技能",
-						order = 7,
+						order = 10,
 						get = function() return self.db.profile.bird.mana.autoActivate end,
 						set = function(value) 
 							self.db.profile.bird.mana.autoActivate = value
@@ -449,7 +493,7 @@ function Cat:OnInitialize()
 						type = "range",
 						name = "激活触发法力",
 						desc = "当法力低于此值时使用激活",
-						order = 8,
+						order = 11,
 						min = 300,
 						max = 7000,
 						step = 100,
@@ -463,7 +507,7 @@ function Cat:OnInitialize()
 						type = "toggle",
 						name = "自动使用消耗品",
 						desc = "法力不足时自动使用草药茶或符文（根据血量选择）",
-						order = 9,
+						order = 12,
 						get = function() return self.db.profile.bird.mana.consumable end,
 						set = function(value) 
 							self.db.profile.bird.mana.consumable = value
@@ -474,7 +518,7 @@ function Cat:OnInitialize()
 						type = "range",
 						name = "消耗品触发法力",
 						desc = "当法力低于此值时使用草药茶/符文（血量<50%用草药茶，>=50%用符文）",
-						order = 10,
+						order = 13,
 						min = 300,
 						max = 7000,
 						step = 100,
@@ -1058,6 +1102,11 @@ function Cat:ApplyConfig()
             otInvulnerability = self.db.profile.bird.combat.otInvulnerability,
             trashOnlyMoonfireWrath = self.db.profile.bird.combat.trashOnlyMoonfireWrath,
             idolDance = self.db.profile.bird.combat.idol_dance and 1 or 0
+        },
+        aoe = {
+            usePotion = self.db.profile.bird.aoe.usePotion,
+            trinketUpper = self.db.profile.bird.aoe.trinketUpper,
+            trinketBelow = self.db.profile.bird.aoe.trinketBelow
         },
         mana = {
             autoActivate = self.db.profile.bird.mana.autoActivate,

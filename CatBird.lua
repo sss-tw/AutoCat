@@ -751,6 +751,162 @@ AutoBird = function()
     end
 end
 
+-- 检查法术是否存在并且CD是否就绪（避免未学习法术时死循环）
+function Bird:GetSpellSlotByName(spellName)
+	local i = 1
+	while true do
+		local name = GetSpellName(i, "spell")
+		if not name then
+			break
+		end
+		if name == spellName then
+			return i
+		end
+		i = i + 1
+	end
+	return nil
+end
+
+-- 获取最高等级法术槽位（兼容1.12的“等级 X”文本）
+function Bird:GetHighestSpellSlotByName(spellName)
+	local bestSlot = nil
+	local bestRank = -1
+	local i = 1
+
+	while true do
+		local name, rankText = GetSpellName(i, "spell")
+		if not name then
+			break
+		end
+
+		if name == spellName then
+			local rankNumber = -1
+			if rankText then
+				local n = tonumber(string.match(rankText, "(%d+)"))
+				if n then
+					rankNumber = n
+				end
+			end
+
+			-- 有明确等级时按等级最大；无等级数字时回退到后出现的同名法术
+			if rankNumber > bestRank or (rankNumber == bestRank and (not bestSlot or i > bestSlot)) then
+				bestRank = rankNumber
+				bestSlot = i
+			end
+		end
+
+		i = i + 1
+	end
+
+	return bestSlot
+end
+
+function Bird:IsSpellReadyByName(spellName)
+	local spellIndex = self:GetHighestSpellSlotByName(spellName)
+
+	if not spellIndex then
+		return false, "not_learned"
+	end
+
+	local start, duration = GetSpellCooldown(spellIndex, "spell")
+	if start == 0 then
+		return true, "ready"
+	end
+
+	if start and duration and (start + duration) <= GetTime() then
+		return true, "ready"
+	end
+
+	return false, "cooldown"
+end
+
+-- 延迟自动落点（鼠标中心，兼容1.12：有时Cast后当帧还未进入SpellIsTargeting）
+function Bird:TryAutoTargetHurricane()
+	if not self.HurricaneTargetFrame then
+		self.HurricaneTargetFrame = CreateFrame("Frame")
+	end
+
+	local frame = self.HurricaneTargetFrame
+	local bird = self
+	bird.HurricaneTargetElapsed = 0
+	bird.HurricaneTargetTries = 0
+
+	frame:SetScript("OnUpdate", function()
+		local elapsed = arg1 or 0.05
+		bird.HurricaneTargetElapsed = bird.HurricaneTargetElapsed + elapsed
+		if bird.HurricaneTargetElapsed < 0.03 then
+			return
+		end
+		bird.HurricaneTargetElapsed = 0
+		bird.HurricaneTargetTries = bird.HurricaneTargetTries + 1
+
+		if SpellIsTargeting and SpellIsTargeting() and CameraOrSelectOrMoveStart and CameraOrSelectOrMoveStop then
+			-- 使用客户端内建的世界点击流程，按鼠标当前位置确认落点
+			CameraOrSelectOrMoveStart()
+			CameraOrSelectOrMoveStop()
+		end
+
+		-- 成功落点（不再处于选圈状态）或达到最大重试次数后停止轮询
+		if (SpellIsTargeting and not SpellIsTargeting()) or bird.HurricaneTargetTries >= 30 then
+			frame:SetScript("OnUpdate", nil)
+		end
+	end)
+end
+
+-- 鸟德手动命令：有限无敌药水 -> 饰品 -> 飓风（鼠标为圆心）
+function Bird:ExecuteHurricaneCombo()
+	-- 正在读条/引导时不重复执行，避免重复触发
+	if (CastingBarFrame and (CastingBarFrame.casting or CastingBarFrame.channeling))
+		or (SpellIsTargeting and SpellIsTargeting()) then
+		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird:|r 正在施法中，已跳过本次连招")
+		return
+	end
+
+	local hurricaneReady = self:IsSpellReadyByName("飓风")
+	if not hurricaneReady then
+		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird:|r 飓风不可用（CD中或未学习），已跳过药水/饰品")
+		return
+	end
+
+	local aoeOptions = AC.Options and AC.Options.bird and AC.Options.bird.aoe or {}
+	local usePotion = aoeOptions.usePotion
+	local useUpperTrinket = aoeOptions.trinketUpper
+	local useBelowTrinket = aoeOptions.trinketBelow
+
+	-- 兼容旧配置：没有AOE配置时默认全开
+	if usePotion == nil then usePotion = true end
+	if useUpperTrinket == nil then useUpperTrinket = true end
+	if useBelowTrinket == nil then useBelowTrinket = true end
+
+	-- 1) 可以的话吃有限无敌药水
+	if usePotion then
+		AC.Lib.UseItemByName("有限无敌药水")
+	end
+
+	-- 2) 可以的话使用饰品
+	if useUpperTrinket and GetInventoryItemCooldown("player", 13) == 0 and AC.TrinketUsable.upper then
+		UseInventoryItem(13)
+	end
+	if useBelowTrinket and GetInventoryItemCooldown("player", 14) == 0 and AC.TrinketUsable.below then
+		UseInventoryItem(14)
+	end
+
+	-- 3) 以鼠标为圆心施放飓风（最高等级）
+	local hurricaneSlot = self:GetHighestSpellSlotByName("飓风")
+	if hurricaneSlot and CastSpell then
+		CastSpell(hurricaneSlot, "spell")
+	else
+		CastSpellByName("飓风")
+	end
+
+	-- 先尝试当帧鼠标落点，再用短时重试兜底，避免只出圈不释放
+	if SpellIsTargeting and SpellIsTargeting() and CameraOrSelectOrMoveStart and CameraOrSelectOrMoveStop then
+		CameraOrSelectOrMoveStart()
+		CameraOrSelectOrMoveStop()
+	end
+	self:TryAutoTargetHurricane()
+end
+
 -- 注册鸟德斜杠命令
 SLASH_AUTOCATBIRD1 = "/autobird"
 SLASH_AUTOCATBIRD2 = "/AutoBird"
@@ -758,6 +914,18 @@ SLASH_AUTOCATBIRD2 = "/AutoBird"
 -- 处理鸟德斜杠命令
 SlashCmdList["AUTOCATBIRD"] = function(msg)
     AutoBird()
+end
+
+-- 注册手动飓风连招命令
+SLASH_BIRDHURRICANE1 = "/autobirdhurricane"
+SLASH_BIRDHURRICANE2 = "/abhe"
+
+SlashCmdList["BIRDHURRICANE"] = function(msg)
+	if not AC.Bird then
+		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird:|r 鸟德模块未加载")
+		return
+	end
+	AC.Bird:ExecuteHurricaneCombo()
 end
 
 -- 获取buff剩余时间（参考CheckBuffer实现）
@@ -891,6 +1059,7 @@ end
 
 -- 调试输出确认函数注册
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r AutoBird函数和命令已注册")
+DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r 手动飓风连招命令：/autobirdhurricane 或 /abhe")
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r Eclipse测试命令：/birdeclipse 或 /be")
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r Buff时间测试：/be time")
 DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96CatBird:|r 完整信息显示：/be full")
