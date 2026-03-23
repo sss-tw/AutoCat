@@ -858,13 +858,13 @@ function Bird:ExecuteHurricaneCombo()
 	-- 正在读条/引导时不重复执行，避免重复触发
 	if (CastingBarFrame and (CastingBarFrame.casting or CastingBarFrame.channeling))
 		or (SpellIsTargeting and SpellIsTargeting()) then
-		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird:|r 正在施法中，已跳过本次连招")
+		self:DebugPrint("正在施法中，已跳过本次连招")
 		return
 	end
 
 	local hurricaneReady = self:IsSpellReadyByName("飓风")
 	if not hurricaneReady then
-		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Bird:|r 飓风不可用（CD中或未学习），已跳过药水/饰品")
+		self:DebugPrint("飓风不可用（CD中或未学习），已跳过药水/饰品")
 		return
 	end
 
