@@ -340,12 +340,7 @@ function Bird:CastAll()
 	end
 
 	-- 鸟德攻击流程
-	-- 根据设置选择战斗模式
-	if AC.Options.bird.combat.trashOnlyMoonfireWrath and AC.Lib.IsTrashTarget() then
-		self:BirdTrashCombatFlow()
-	else
-		self:BirdCombatFlow()
-	end
+	self:BirdCombatFlow()
 end
 
 -- 确保在正确的形态下（枭兽形态优先，否则人类形态）
@@ -453,6 +448,8 @@ function Bird:BirdCombatFlow()
 	-- 使用AutoCat的DOT状态检查
 	local swarm = AC.Event.GetSwarmDot()
 	local moonfire = AC.Event.GetMoonfireDot()
+	local isTrashTarget = AC.Lib.IsTrashTarget()
+	local trashNoSwarm = AC.Options.bird.combat.trashOnlyMoonfireWrath and isTrashTarget
 	
 	-- 使用AutoCat的BUFF状态检查
 	local hasBalance = AC.Lib.Buff("万物平衡")
@@ -473,6 +470,34 @@ function Bird:BirdCombatFlow()
 			return not swarm
 		elseif name == "月火术" then
 			return not moonfire
+		end
+		return false
+	end
+
+	-- 打愤怒前先补虫群（若目标没有虫群）
+	local function TrySwarmBeforeWrath(reason)
+		-- 小怪模式开启时：小怪沿用主循环，但不补虫群
+		if trashNoSwarm then
+			return false
+		end
+		if CanDebuff("虫群") then
+			self:EquipIdolForSpell("虫群")
+			CastSpellByName("虫群")
+			AC.Event.lastSwarmTime = GetTime()
+			self:DebugPrint("%s：愤怒前补虫群", reason)
+			return true
+		end
+		return false
+	end
+
+	-- 打星火术前先补月火（若目标没有月火）
+	local function TryMoonfireBeforeStarfire(reason)
+		if CanDebuff("月火术") then
+			self:EquipIdolForSpell("月火术")
+			CastSpellByName("月火术")
+			AC.Event.lastMoonfireTime = GetTime()
+			self:DebugPrint("%s：先补月火术", reason)
+			return true
 		end
 		return false
 	end
@@ -534,51 +559,62 @@ function Bird:BirdCombatFlow()
 	end
 
 	-- 新的技能释放逻辑
-	-- 1. DOT维护（最高优先级）
-	-- 虫群没了补虫群
-	if CanDebuff("虫群") then
-		-- 神像舞：装备传播神像
-		self:EquipIdolForSpell("虫群")
-		CastSpellByName("虫群")
-		AC.Event.lastSwarmTime = GetTime()
-		self:DebugPrint("补虫群")
-		return
-	end
-	
-	-- 月火没了补月火
-	if CanDebuff("月火术") then
-		-- 神像舞：装备月亮神像
-		self:EquipIdolForSpell("月火术")
-		CastSpellByName("月火术")
-		AC.Event.lastMoonfireTime = GetTime()
-		self:DebugPrint("补月火术")
-		return
-	end
-
-	-- 2. 检查日蚀/月蚀状态（第二优先级）
+	-- 1. 检查日蚀/月蚀状态（最高优先级）
 	local hasSolarEclipse = AC.Lib.Buff("日蚀")
 	local hasLunarEclipse = AC.Lib.Buff("月蚀")
 	
 	if hasSolarEclipse then
-		-- local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
-		-- -- 计算星火术实际施法时间(考虑buff减免)
-		-- local wrathCastTime = 1.5  -- 基础施法时间
+		local solarTimeLeft = self:GetBuffTimeLeft("日蚀")
+		local wrathCastTime = 1.5  -- 愤怒基础施法时间
+
+		-- 进入日蚀时，如果还在读星火术则立刻打断，切换到日蚀节奏
+		local eventCastingActive = AC.Event and AC.Event.playerCasting
+		local eventCastingSpell = (AC.Event and AC.Event.playerCastingSpell) or ""
+		local lastStartSpell = (AC.Event and AC.Event.lastPlayerCastStartSpell) or ""
+		local lastStartTime = (AC.Event and AC.Event.lastPlayerCastStartTime) or 0
+		local lastStartAge = GetTime() - lastStartTime
+		local eventSpellIsStarfire = string.find(eventCastingSpell, "星火") or string.find(eventCastingSpell, "Starfire")
+		local recentStartIsStarfire = (string.find(lastStartSpell, "星火") or string.find(lastStartSpell, "Starfire")) and lastStartAge < 3.5
+		self:DebugPrint("日蚀打断检测(事件)：active=%s spell=[%s] last=[%s] age=%.2f", tostring(eventCastingActive), tostring(eventCastingSpell), tostring(lastStartSpell), lastStartAge)
+		if (eventCastingActive and eventSpellIsStarfire or recentStartIsStarfire) and SpellStopCasting then
+			SpellStopCasting()
+
+			-- 某些端里首帧打断会被吞，0.05秒后再补一次（不使用任何位移）
+			if not self.DelayedStopCastFrame then
+				self.DelayedStopCastFrame = CreateFrame("Frame")
+			end
+			local stopFrame = self.DelayedStopCastFrame
+			local elapsed = 0
+			stopFrame:SetScript("OnUpdate", function()
+				elapsed = elapsed + (arg1 or 0)
+				if elapsed < 0.05 then
+					return
+				end
+				stopFrame:SetScript("OnUpdate", nil)
+				if SpellStopCasting then
+					SpellStopCasting()
+				end
+			end)
+
+			if TrySwarmBeforeWrath("进入日蚀打断后") then
+				return
+			end
+			CastSpellByName("愤怒")
+			self:DebugPrint("进入日蚀：事件判定星火读条，执行双次打断并切愤怒（current=[%s] last=[%s]）", eventCastingSpell, lastStartSpell)
+			return
+		end
+		self:DebugPrint("日蚀未打断(事件)：eventMatch=%s recentMatch=%s spellStop=%s",
+			tostring(not not eventSpellIsStarfire and eventCastingActive), tostring(not not recentStartIsStarfire), tostring(not not SpellStopCasting))
 		
-		-- -- 检查自然恩典buff(减少0.5秒)
-		-- if AC.Lib.Buff("自然恩典") then
-		-- 	wrathCastTime = wrathCastTime - 0.5
-		-- end
-		
-		
-		-- -- 如果日蚀剩余时间不够打星火术，直接补虫群
-		-- if solarTimeLeft and solarTimeLeft < wrathCastTime then
-		-- 	CastSpellByName("虫群")
-		-- 	AC.Event.lastSwarmTime = GetTime()
-		-- 	self:DebugPrint("日蚀剩余%.1f秒(<%.1f)，直接补虫群", solarTimeLeft, wrathCastTime)
-		-- 	return
-		-- end
+		-- 自然恩典减少0.5秒施法时间
+		if AC.Lib.Buff("自然恩典") then
+			wrathCastTime = wrathCastTime - 0.5
+		end
 		
 		-- 日蚀期间专注愤怒（愤怒不需要神像）
+		if TrySwarmBeforeWrath("日蚀") then
+			return
+		end
 		CastSpellByName("愤怒")
 		self:DebugPrint("日蚀：愤怒(剩余%.1f秒)", solarTimeLeft or 0)
 		return
@@ -608,6 +644,9 @@ function Bird:BirdCombatFlow()
 		-- end
 		
 		-- 月蚀期间专注星火术
+		if TryMoonfireBeforeStarfire("月蚀") then
+			return
+		end
 		-- 神像舞：装备潮汐神像
 		self:EquipIdolForSpell("星火术")
 		CastSpellByName("星火术")
@@ -615,7 +654,7 @@ function Bird:BirdCombatFlow()
 		return
 	end
 	
-	-- 3. 检查昼至和夜至状态（剩余时间判断）
+	-- 2. 检查昼至和夜至状态（剩余时间判断）
 	local hasDayfall = AC.Lib.Buff("昼至")
 	local hasNightfall = AC.Lib.Buff("夜至")
 	local dayfallTimeLeft = self:GetBuffTimeLeft("昼至")
@@ -633,8 +672,11 @@ function Bird:BirdCombatFlow()
 		self:DebugPrint("夜至剩余%.1f秒，不视为夜至状态", nightfallTimeLeft)
 	end
 	
-	-- 4. 昼至状态下打星火术
+	-- 3. 昼至状态下打星火术
 	if hasDayfall and not hasNightfall then
+		if TryMoonfireBeforeStarfire("昼至状态") then
+			return
+		end
 		-- 神像舞：装备潮汐神像
 		self:EquipIdolForSpell("星火术")
 		CastSpellByName("星火术")
@@ -642,95 +684,28 @@ function Bird:BirdCombatFlow()
 		return
 	end
 	
-	-- 5. 夜至状态下打愤怒
+	-- 4. 夜至状态下打愤怒
 	if hasNightfall and not hasDayfall then
+		if TrySwarmBeforeWrath("夜至状态") then
+			return
+		end
 		-- 愤怒不需要神像
 		CastSpellByName("愤怒")
 		self:DebugPrint("夜至状态：愤怒")
 		return
 	end
 	
-	-- 6. 两个状态都有或者都没有的情况
+	-- 5. 两个状态都有或者都没有的情况
 	if (hasDayfall and hasNightfall) or (not hasDayfall and not hasNightfall) then
-		local hasNatureBlessing = AC.Lib.Buff("自然之赐")
-		local hasBalance = AC.Lib.Buff("万物平衡")
-		
-		if hasNatureBlessing and hasBalance then
-			-- 都有：打星火
-			-- 神像舞：装备潮汐神像
-			self:EquipIdolForSpell("星火术")
-			CastSpellByName("星火术")
-			self:DebugPrint("自然之赐+万物平衡：星火术")
-		elseif hasNatureBlessing and not hasBalance then
-			-- 只有自然之赐：打愤怒（不需要神像）
-			CastSpellByName("愤怒")
-			self:DebugPrint("自然之赐：愤怒")
-		elseif not hasNatureBlessing and hasBalance then
-			-- 只有万物平衡：打星火
-			-- 神像舞：装备潮汐神像
-			self:EquipIdolForSpell("星火术")
-			CastSpellByName("星火术")
-			self:DebugPrint("万物平衡：星火术")
-		else
-			-- 都没有：打愤怒（不需要神像）
-			CastSpellByName("愤怒")
-			self:DebugPrint("无buff：愤怒")
+		-- 自然之赐/万物平衡已移除：统一打星火术
+		if TryMoonfireBeforeStarfire("昼至夜至冲突/空窗") then
+			return
 		end
+		self:EquipIdolForSpell("星火术")
+		CastSpellByName("星火术")
+		self:DebugPrint("昼至夜至冲突/空窗：星火术")
 		return
 	end
-end
-
-
--- 小怪战斗流程（只使用月火术和愤怒）
-function Bird:BirdTrashCombatFlow()
-	local targetHealth = UnitHealth("target")
-	local targetMaxHealth = UnitHealthMax("target")
-	local targetHealthPercent = 0
-	if targetMaxHealth and targetMaxHealth > 0 then
-		targetHealthPercent = (targetHealth / targetMaxHealth) * 100
-	end
-	
-	-- 没有目标时不继续
-	if not UnitExists("target") then
-		return
-	end
-	
-	-- 使用AutoCat的DOT状态检查
-	local moonfire = AC.Event.GetMoonfireDot()
-	
-	self:DebugPrint("小怪战斗流程：目标血量%.1f%%，月火：%s", 
-		targetHealthPercent, tostring(not not moonfire))
-	
-	-- 可否减益函数（只检查月火术）
-	local function CanDebuff(name)
-		if name == "月火术" then
-			return not moonfire
-		end
-		return false
-	end
-	
-	-- 奥术免疫检查：如果目标奥术免疫，只使用愤怒（自然伤害）
-	if AC.Config.targetArcaneImmune then
-		CastSpellByName("愤怒")
-		self:DebugPrint("目标奥术免疫：只使用愤怒")
-		return
-	end
-
-	-- 小怪战斗逻辑：只使用月火术和愤怒
-	-- 1. DOT维护（最高优先级）
-	-- 月火没了补月火
-	if CanDebuff("月火术") then
-		-- 神像舞：装备月亮神像
-		self:EquipIdolForSpell("月火术")
-		CastSpellByName("月火术")
-		AC.Event.lastMoonfireTime = GetTime()
-		self:DebugPrint("补月火术")
-		return
-	end
-
-	-- 2. 主要攻击：只使用愤怒（不需要神像）
-	CastSpellByName("愤怒")
-	self:DebugPrint("小怪模式：愤怒")
 end
 
 -- 所有状态检查都使用现有的AC.Lib.Buff系统

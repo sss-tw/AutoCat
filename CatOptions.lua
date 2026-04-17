@@ -109,7 +109,7 @@ local defaultConfig = {
 		-- 战斗设置
 		combat = {
 			otInvulnerability = true,    -- OT吃有限无敌
-			trashOnlyMoonfireWrath = false,  -- 小怪只打月火愤怒
+			trashOnlyMoonfireWrath = false,  -- 小怪模式不打虫群
 			idol_dance = true,           -- 是否自动使用神像舞
 		},
 		-- AOE设置（手动飓风连招）
@@ -415,8 +415,8 @@ function Cat:OnInitialize()
 					},
 					trash_only_moonfire_wrath = {
 						type = "toggle",
-						name = "小怪只打月火愤怒",
-						desc = "当目标为小怪时只使用月火术和愤怒，不使用其他技能",
+						name = "小怪不打虫群",
+						desc = "当目标为小怪时启用小怪模式（不补虫群）",
 						order = 3,
 						get = function() return self.db.profile.bird.combat.trashOnlyMoonfireWrath end,
 						set = function(value) 

@@ -8,11 +8,6 @@ AC.EventHandlers = AC.EventHandlers or {} -- 事件处理程序
 
 -- 检查饰品可用性的函数
 function AC.CheckTrinketUsability()
-	-- 调试输出
-	if Cat and Cat:IsDebugging() then
-		DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 开始检查饰品可用性")
-	end
-	
 	-- 创建隐藏的tooltip用于扫描装备描述
 	if not AC.TrinketScanTooltip then
 		AC.TrinketScanTooltip = CreateFrame("GameTooltip", "AutoCatTrinketScanTooltip", nil, "GameTooltipTemplate")
@@ -45,21 +40,8 @@ function AC.CheckTrinketUsability()
 		end
 		AutoCat.TrinketUsable.upper = hasUseEffect
 		
-		-- 调试输出
-		if Cat and Cat:IsDebugging() then
-			local displayName = itemName or "未知"
-			
-			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 上部饰品 " .. displayName .. " - " .. (hasUseEffect and "可使用" or "不可使用"))
-			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 上部饰品tooltip行数: " .. AC.TrinketScanTooltip:NumLines())
-			for j, tooltipText in ipairs(tooltipTexts) do
-				DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r   第" .. j .. "行: " .. tooltipText)
-			end
-		end
 	else
 		AutoCat.TrinketUsable.upper = false
-		if Cat and Cat:IsDebugging() then
-			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 上部饰品槽位为空")
-		end
 	end
 	
 	-- 检查下部饰品（槽位14）
@@ -88,21 +70,8 @@ function AC.CheckTrinketUsability()
 		end
 		AutoCat.TrinketUsable.below = hasUseEffect
 		
-		-- 调试输出
-		if Cat and Cat:IsDebugging() then
-			local displayName = itemName or "未知"
-			
-			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 下部饰品 " .. displayName .. " - " .. (hasUseEffect and "可使用" or "不可使用"))
-			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 下部饰品tooltip行数: " .. AC.TrinketScanTooltip:NumLines())
-			for j, tooltipText in ipairs(tooltipTexts) do
-				DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r   第" .. j .. "行: " .. tooltipText)
-			end
-		end
 	else
 		AutoCat.TrinketUsable.below = false
-		if Cat and Cat:IsDebugging() then
-			DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Trinket Debug:|r 下部饰品槽位为空")
-		end
 	end
 end
 
@@ -119,6 +88,10 @@ AC.Event.mainHandBeginTime = 0 -- 普攻计时器(主手)
 AC.Event.mainHandDuration = 0 -- 普攻持续时间
 AC.Event.gcdTimer = 0 -- GCD计时器
 AC.Event.isCast = false -- 是否正在施法
+AC.Event.playerCasting = false -- 玩家是否在读条（事件驱动）
+AC.Event.playerCastingSpell = "" -- 玩家当前读条法术名（事件驱动）
+AC.Event.lastPlayerCastStartSpell = "" -- 最近一次施法开始法术名
+AC.Event.lastPlayerCastStartTime = 0 -- 最近一次施法开始时间
 AC.Event.oldEnergy = 0 -- 旧能量值
 AC.Event.restoredEnergyTime = 0.0 -- 回能时间点
 AC.Event.rakeCheck = {} -- 扫击检查
@@ -238,6 +211,13 @@ function AC.EventHandlers.OnEvent()
     -- 施法事件处理，用于处理GCD
     elseif event == "SPELLCAST_START" then
         isCast = true
+        AC.Event.playerCasting = true
+        AC.Event.playerCastingSpell = arg1 or ""
+        AC.Event.lastPlayerCastStartSpell = arg1 or ""
+        AC.Event.lastPlayerCastStartTime = GetTime()
+        if Cat and Cat:IsDebugging() then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Event Debug:|r SPELLCAST_START arg1=[%s]", tostring(arg1)))
+        end
 
         -- GCD时间启动
         gcdtimer = GetTime()
@@ -254,6 +234,11 @@ function AC.EventHandlers.OnEvent()
         -- 未读条，应该是瞬发，GCD时间启动
         gcdtimer = GetTime()
         end
+        if Cat and Cat:IsDebugging() then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Event Debug:|r SPELLCAST_STOP arg1=[%s] last=[%s]", tostring(arg1), tostring(AC.Event.playerCastingSpell)))
+        end
+        AC.Event.playerCasting = false
+        AC.Event.playerCastingSpell = ""
         
         -- 治疗模块施法停止处理
         if AC.Healer and AC.Healer.OnSpellcastStop then
@@ -264,6 +249,8 @@ function AC.EventHandlers.OnEvent()
         if isCast then
             isCast = false
         end
+        AC.Event.playerCasting = false
+        AC.Event.playerCastingSpell = ""
         
         -- 治疗模块施法失败处理
         if AC.Healer and AC.Healer.OnSpellcastFailed then
@@ -274,6 +261,8 @@ function AC.EventHandlers.OnEvent()
         if isCast then
             isCast = false
         end
+        AC.Event.playerCasting = false
+        AC.Event.playerCastingSpell = ""
         
         -- 治疗模块施法中断处理
         if AC.Healer and AC.Healer.OnSpellcastInterrupted then
