@@ -589,7 +589,7 @@ function AC.Lib.GetTargetType()
 	
 	local targetMaxHealth = UnitHealthMax("target")
 	
-	-- 统一判断标准：世界Boss或血量大于等于100000的为Boss，其他都是小怪
+	-- 统一判断标准：世界Boss或血量大于等于200000的为Boss，其他都是小怪
 	local classification = UnitClassification("target")
 	local isWorldBoss = classification == "worldboss"
 	
@@ -602,7 +602,7 @@ function AC.Lib.GetTargetType()
 		end
 	end
 	
-	if isWorldBoss or targetMaxHealth >= 100000 then
+	if isWorldBoss or targetMaxHealth >= 200000 then
 		return "boss"
 	else
 		return "trash"
