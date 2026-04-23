@@ -489,6 +489,8 @@ local monsterList = {
     ["不死的居民"] = true,
     ["不死的看守者"] = true,
     ["幽灵工人"] = true,
+	["古拉巴什狂暴者"] = true,
+	["腐烂古树"] = true,
 }
 -- 元素生物,机械中的白名单列表
 local MPmonsterWhiteList = {
