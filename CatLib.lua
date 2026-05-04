@@ -13,6 +13,7 @@ local _tipColor = "|cFF906d96Cat Tip:|r |cFFf9cdfd"
 -- 配置变量
 AC.Config.targetBleed = true -- 目标是否可以流血
 AC.Config.targetArcaneImmune = false -- 目标是否奥术免疫
+AC.Config.targetNatureImmune = false -- 目标是否自然免疫
 AC.Config.clawEnergy = 40 -- 爪击所需能量
 AC.Config.rakeEnergy = 35 -- 扫击所需能量
 AC.Config.tearEnergy = 60 -- 撕扯所需能量
@@ -519,6 +520,13 @@ local arcaneImmuneList = {
     ["绿色亲和"] = true,
 }
 
+-- 自然免疫怪物名单
+local natureImmuneList = {
+	["被污染的胶团"] = true,
+	["落潭"] = true,
+	["魔力亲和"] = true,
+}
+
 -- 检验单位能否流血
 function AC.Lib.CanBleed(unit)
 	unit = unit or "target"
@@ -558,6 +566,23 @@ function AC.Lib.IsArcaneImmune(unit)
 
 	-- 只检查奥术免疫名单
 	if arcaneImmuneList[name] == true then
+		return true
+	end
+
+	return false
+end
+
+-- 检验单位是否自然免疫
+function AC.Lib.IsNatureImmune(unit)
+	unit = unit or "target"
+	local name = UnitName(unit)
+
+	if not name then
+		return false
+	end
+
+	-- 只检查自然免疫名单
+	if natureImmuneList[name] == true then
 		return true
 	end
 

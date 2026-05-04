@@ -179,6 +179,8 @@ function AC.EventHandlers.OnEvent()
         AC.Config.targetBleed = AC.Lib.CanBleed()
         -- 检测目标是否奥术免疫
         AC.Config.targetArcaneImmune = AC.Lib.IsArcaneImmune()
+        -- 检测目标是否自然免疫
+        AC.Config.targetNatureImmune = AC.Lib.IsNatureImmune()
         
         -- 熊德目标变化处理
         if AC.Bear then

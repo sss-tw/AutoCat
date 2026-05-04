@@ -450,6 +450,7 @@ function Bird:BirdCombatFlow()
 	local moonfire = AC.Event.GetMoonfireDot()
 	local isTrashTarget = AC.Lib.IsTrashTarget()
 	local trashNoSwarm = AC.Options.bird.combat.trashOnlyMoonfireWrath and isTrashTarget
+	local targetNatureImmune = AC.Config.targetNatureImmune
 	
 	-- 使用AutoCat的BUFF状态检查
 	local hasBalance = AC.Lib.Buff("万物平衡")
@@ -461,23 +462,45 @@ function Bird:BirdCombatFlow()
 	
 	local mana = UnitMana("player")
 	
-	self:DebugPrint("鸟德攻击流程：目标血量%.1f%%，法力%d，奥术免疫：%s，日蚀：%s，月蚀：%s，昼至：%s，夜至：%s，虫群：%s，月火：%s，自然之赐：%s，万物平衡：%s", 
-		targetHealthPercent, mana, tostring(not not AC.Config.targetArcaneImmune), tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
+	self:DebugPrint("鸟德攻击流程：目标血量%.1f%%，法力%d，奥术免疫：%s，自然免疫：%s，日蚀：%s，月蚀：%s，昼至：%s，夜至：%s，虫群：%s，月火：%s，自然之赐：%s，万物平衡：%s", 
+		targetHealthPercent, mana, tostring(not not AC.Config.targetArcaneImmune), tostring(not not targetNatureImmune), tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
 	
 	-- 可否减益函数（使用AutoCat的DOT检查）
 	local function CanDebuff(name)
 		if name == "虫群" then
-			return not swarm
+			return not swarm and not targetNatureImmune
 		elseif name == "月火术" then
 			return not moonfire
 		end
 		return false
 	end
 
+	local function CastWrathOrFallback(reason)
+		if targetNatureImmune then
+			if CanDebuff("月火术") then
+				self:EquipIdolForSpell("月火术")
+				CastSpellByName("月火术")
+				AC.Event.lastMoonfireTime = GetTime()
+				self:DebugPrint("%s：目标自然免疫，跳过愤怒并先补月火术", reason)
+				return
+			end
+
+			self:EquipIdolForSpell("星火术")
+			CastSpellByName("星火术")
+			self:DebugPrint("%s：目标自然免疫，跳过愤怒并改打星火术", reason)
+			return
+		end
+
+		CastSpellByName("愤怒")
+	end
+
 	-- 打愤怒前先补虫群（若目标没有虫群）
 	local function TrySwarmBeforeWrath(reason)
 		-- 小怪模式开启时：小怪沿用主循环，但不补虫群
 		if trashNoSwarm then
+			return false
+		end
+		if targetNatureImmune then
 			return false
 		end
 		if CanDebuff("虫群") then
@@ -553,8 +576,12 @@ function Bird:BirdCombatFlow()
 	
 	-- 奥术免疫检查：如果目标奥术免疫，只使用愤怒（自然伤害）
 	if AC.Config.targetArcaneImmune then
-		CastSpellByName("愤怒")
-		self:DebugPrint("目标奥术免疫：只使用愤怒")
+		CastWrathOrFallback("目标奥术免疫")
+		if targetNatureImmune then
+			self:DebugPrint("目标奥术免疫且自然免疫：已跳过愤怒")
+		else
+			self:DebugPrint("目标奥术免疫：只使用愤怒")
+		end
 		return
 	end
 
@@ -599,7 +626,7 @@ function Bird:BirdCombatFlow()
 			if TrySwarmBeforeWrath("进入日蚀打断后") then
 				return
 			end
-			CastSpellByName("愤怒")
+			CastWrathOrFallback("进入日蚀打断后")
 			self:DebugPrint("进入日蚀：事件判定星火读条，执行双次打断并切愤怒（current=[%s] last=[%s]）", eventCastingSpell, lastStartSpell)
 			return
 		end
@@ -615,7 +642,7 @@ function Bird:BirdCombatFlow()
 		if TrySwarmBeforeWrath("日蚀") then
 			return
 		end
-		CastSpellByName("愤怒")
+		CastWrathOrFallback("日蚀")
 		self:DebugPrint("日蚀：愤怒(剩余%.1f秒)", solarTimeLeft or 0)
 		return
 	end
@@ -690,7 +717,7 @@ function Bird:BirdCombatFlow()
 			return
 		end
 		-- 愤怒不需要神像
-		CastSpellByName("愤怒")
+		CastWrathOrFallback("夜至状态")
 		self:DebugPrint("夜至状态：愤怒")
 		return
 	end
