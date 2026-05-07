@@ -123,6 +123,9 @@ frame:RegisterEvent("SPELLCAST_STOP")
 frame:RegisterEvent("SPELLCAST_FAILED")
 frame:RegisterEvent("SPELLCAST_INTERRUPTED")
 frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+frame:RegisterEvent("PLAYER_AURAS_CHANGED")
+frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+frame:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
 
 -- 鸟德Eclipse状态跟踪相关事件
 frame:RegisterEvent("UNIT_AURA")
@@ -275,6 +278,12 @@ function AC.EventHandlers.OnEvent()
         -- 治疗模块法术成功处理
         if AC.Healer and AC.Healer.OnSpellcastSucceeded then
             AC.Healer.OnSpellcastSucceeded(arg1, arg2, arg3, arg4, arg5)
+        end
+    
+    -- 形态变化后处理：只要不是猫形态，就清除猛虎之怒计时
+    elseif event == "PLAYER_AURAS_CHANGED" or event == "UPDATE_SHAPESHIFT_FORM" or event == "UPDATE_SHAPESHIFT_FORMS" then
+        if AC.Combat and AC.Combat.ClearTigerFuryTimer and not AC.Lib.GetShape(3) then
+            AC.Combat.ClearTigerFuryTimer()
         end
     
     -- 鸟德Eclipse状态跟踪
