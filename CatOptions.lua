@@ -33,7 +33,16 @@ local defaultConfig = {
                 avoid_player_target = true,  -- 如果目标是玩家则停止攻击并切换目标
                 ot_bear_form = true,  -- OT时自动变熊
                 cower_enabled = true, -- 仇恨超阈值时自动畏缩
-                cower_threshold = 80  -- 畏缩触发阈值（百分比）
+                cower_threshold = 80,  -- 畏缩触发阈值（百分比）
+                t35_burst = {
+                        berserk = "use",         -- 狂暴：none/use/boss
+                        trinket_upper = "use",   -- 上部饰品：none/use/boss/force
+                        trinket_below = "none",  -- 下部饰品：none/use/boss/force
+                        mighty_rage_potion = "use", -- 强效怒气药水：none/use/boss
+                        haste_potion = "none",   -- 加速药水：none/use/boss
+                        rake = true,             -- 爆发时补扫击
+                        rip = true               -- 爆发时补撕扯
+                }
         },
         -- 治疗设置
         healing = {
@@ -161,7 +170,14 @@ AutoCat.Options = {
 	avoidPlayerTarget = 1,
         rejuvRank = 6,
         cowerEnabled = 1,
-        cowerThreshold = 80
+        cowerThreshold = 80,
+        t35BurstBerserk = "use",
+        t35BurstTrinketUpper = "use",
+        t35BurstTrinketBelow = "none",
+        t35BurstMightyRagePotion = "use",
+        t35BurstHastePotion = "none",
+        t35BurstRake = 1,
+        t35BurstRip = 1
 }
 
 -- 初始化
@@ -170,6 +186,22 @@ function Cat:OnInitialize()
 	self:RegisterDB("AutoCatDB")
 	-- 注册默认值
 	self:RegisterDefaults('profile', defaultConfig)
+	if not self.db.profile.combat.t35_burst then
+		self.db.profile.combat.t35_burst = {}
+	end
+	local t35Burst = self.db.profile.combat.t35_burst
+	if type(t35Burst.berserk) == "boolean" then t35Burst.berserk = t35Burst.berserk and "use" or "none" end
+	if type(t35Burst.trinket_upper) == "boolean" then t35Burst.trinket_upper = t35Burst.trinket_upper and "use" or "none" end
+	if type(t35Burst.trinket_below) == "boolean" then t35Burst.trinket_below = t35Burst.trinket_below and "use" or "none" end
+	if type(t35Burst.mighty_rage_potion) == "boolean" then t35Burst.mighty_rage_potion = t35Burst.mighty_rage_potion and "use" or "none" end
+	if type(t35Burst.haste_potion) == "boolean" then t35Burst.haste_potion = t35Burst.haste_potion and "use" or "none" end
+	if t35Burst.berserk == nil then t35Burst.berserk = "use" end
+	if t35Burst.trinket_upper == nil then t35Burst.trinket_upper = "use" end
+	if t35Burst.trinket_below == nil then t35Burst.trinket_below = "none" end
+	if t35Burst.mighty_rage_potion == nil then t35Burst.mighty_rage_potion = "use" end
+	if t35Burst.haste_potion == nil then t35Burst.haste_potion = "none" end
+	if t35Burst.rake == nil then t35Burst.rake = true end
+	if t35Burst.rip == nil then t35Burst.rip = true end
 	
 	-- 应用配置
 	self:ApplyConfig()
@@ -393,6 +425,118 @@ function Cat:OnInitialize()
 							self.db.profile.combat.cower_threshold = value
 							self:ApplyConfig()
 						end
+					},
+					t35_burst = {
+						type = "group",
+						name = "5T3.5爆发设置",
+						desc = "阿莎曼之怒出现时使用爆发技能和物品",
+						order = 15,
+						args = {
+							berserk = {
+								type = "text",
+								name = "爆发时使用狂暴",
+								desc = "阿莎曼之怒出现时狂暴的使用策略",
+								order = 1,
+								get = function() return self.db.profile.combat.t35_burst.berserk end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.berserk = value
+									self:ApplyConfig()
+								end,
+								validate = {
+									["none"] = "不使用",
+									["use"] = "使用",
+									["boss"] = "仅boss"
+								}
+							},
+							trinket_upper = {
+								type = "text",
+								name = "爆发时使用上部饰品",
+								desc = "阿莎曼之怒出现时上部饰品的使用策略；无条件使用会跳过饰品可用性扫描",
+								order = 2,
+								get = function() return self.db.profile.combat.t35_burst.trinket_upper end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.trinket_upper = value
+									self:ApplyConfig()
+								end,
+								validate = {
+									["none"] = "不使用",
+									["use"] = "使用",
+									["boss"] = "仅boss",
+									["force"] = "无条件使用"
+								}
+							},
+							trinket_below = {
+								type = "text",
+								name = "爆发时使用下部饰品",
+								desc = "阿莎曼之怒出现时下部饰品的使用策略；无条件使用会跳过饰品可用性扫描",
+								order = 3,
+								get = function() return self.db.profile.combat.t35_burst.trinket_below end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.trinket_below = value
+									self:ApplyConfig()
+								end,
+								validate = {
+									["none"] = "不使用",
+									["use"] = "使用",
+									["boss"] = "仅boss",
+									["force"] = "无条件使用"
+								}
+							},
+							mighty_rage_potion = {
+								type = "text",
+								name = "爆发时使用强效怒气药水",
+								desc = "阿莎曼之怒出现时强效怒气药水的使用策略",
+								order = 4,
+								get = function() return self.db.profile.combat.t35_burst.mighty_rage_potion end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.mighty_rage_potion = value
+									self:ApplyConfig()
+								end,
+								validate = {
+									["none"] = "不使用",
+									["use"] = "使用",
+									["boss"] = "仅boss"
+								}
+							},
+							haste_potion = {
+								type = "text",
+								name = "爆发时使用加速药水",
+								desc = "阿莎曼之怒出现时加速药水的使用策略",
+								order = 5,
+								get = function() return self.db.profile.combat.t35_burst.haste_potion end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.haste_potion = value
+									self:ApplyConfig()
+								end,
+								validate = {
+									["none"] = "不使用",
+									["use"] = "使用",
+									["boss"] = "仅boss"
+								}
+							},
+							rake = {
+								type = "toggle",
+								name = "爆发时补扫击",
+								desc = "阿莎曼之怒出现且扫击爆发标记未完成时补扫击",
+								order = 6,
+								get = function() return self.db.profile.combat.t35_burst.rake end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.rake = value
+									self:ApplyConfig()
+								end
+							},
+							rip = {
+								type = "toggle",
+								name = "爆发时补撕扯",
+								desc = "阿莎曼之怒出现且撕扯爆发标记未完成时补5星撕扯",
+								order = 7,
+								get = function() return self.db.profile.combat.t35_burst.rip end,
+								set = function(value)
+									self.db.profile.combat.t35_burst.rip = value
+									self:ApplyConfig()
+								end
+							}
+						}
 					}
 				}
 			},
@@ -1049,6 +1193,14 @@ function Cat:ApplyConfig()
     AutoCat.Options.otBearForm = self.db.profile.combat.ot_bear_form and 1 or 0
     AutoCat.Options.cowerEnabled = self.db.profile.combat.cower_enabled and 1 or 0
     AutoCat.Options.cowerThreshold = self.db.profile.combat.cower_threshold or 80
+    local t35Burst = self.db.profile.combat.t35_burst or {}
+    AutoCat.Options.t35BurstBerserk = t35Burst.berserk or "none"
+    AutoCat.Options.t35BurstTrinketUpper = t35Burst.trinket_upper or "none"
+    AutoCat.Options.t35BurstTrinketBelow = t35Burst.trinket_below or "none"
+    AutoCat.Options.t35BurstMightyRagePotion = t35Burst.mighty_rage_potion or "none"
+    AutoCat.Options.t35BurstHastePotion = t35Burst.haste_potion or "none"
+    AutoCat.Options.t35BurstRake = t35Burst.rake and 1 or 0
+    AutoCat.Options.t35BurstRip = t35Burst.rip and 1 or 0
     
     -- 饰品设置
     AutoCat.Options.trinketUpper = self.db.profile.trinket.upper and 1 or 0

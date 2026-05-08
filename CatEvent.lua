@@ -189,6 +189,9 @@ function AC.EventHandlers.OnEvent()
         if AC.Bear then
             AC.Bear:OnTargetChanged()
         end
+        if AC.Combat and AC.Combat.ClearT35BurstFlags then
+            AC.Combat.ClearT35BurstFlags()
+        end
 
     -- 背面判断
     elseif event == "UI_ERROR_MESSAGE" then
@@ -210,6 +213,9 @@ function AC.EventHandlers.OnEvent()
         -- 熊德离开战斗处理
         if AC.Bear then
             AC.Bear:OnLeaveCombat()
+        end
+        if AC.Combat and AC.Combat.ClearT35BurstFlags then
+            AC.Combat.ClearT35BurstFlags()
         end
 
         -- DEFAULT_CHAT_FRAME:AddMessage("|cFFff647e提示：|r|cFFfca4bc"..arg1.."|r")
@@ -326,10 +332,20 @@ function AC.EventHandlers.OnEvent()
             if arg4 == 9904 then
                 AC.Event.rakeDelayTime[arg2] = GetTime()
                 AC.Event.lastRakeTime = GetTime() -- 记录上次扫击时间
+                local _, playerGUID = UnitExists("player")
+                if AC.Combat and arg1 == playerGUID and AC.Lib.Buff("阿莎曼之怒") then
+                    AC.Combat.t35BurstRakeFlag = 1
+                    DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r T3.5爆发扫击已确认施放，扫击flag=1")
+                end
             -- 撕扯
             elseif arg4 == 9896 then
                 AC.Event.ripDelayTime[arg2] = GetTime()
                 AC.Event.lastRipTime = GetTime() -- 记录上次撕扯时间
+                local _, playerGUID = UnitExists("player")
+                if AC.Combat and arg1 == playerGUID and AC.Lib.Buff("阿莎曼之怒") then
+                    AC.Combat.t35BurstRipFlag = 1
+                    DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r T3.5爆发撕扯已确认施放，撕扯flag=1")
+                end
             -- 会重置普攻的技能（针对职业：战士）
             -- 英勇打击或顺劈斩
             elseif arg4 == 25286 or arg4 == 20569 then

@@ -85,6 +85,126 @@ local function HandleThreatCower(combat)
 	return false
 end
 
+AC.Combat.t35BurstRakeFlag = 0
+AC.Combat.t35BurstRipFlag = 0
+
+function AC.Combat.ClearT35BurstFlags()
+	AC.Combat.t35BurstRakeFlag = 0
+	AC.Combat.t35BurstRipFlag = 0
+end
+
+function AC.Combat.MarkT35NormalRake()
+	if not AC.Lib.Buff("阿莎曼之怒") then
+		AC.Combat.t35BurstRakeFlag = 0
+	end
+end
+
+function AC.Combat.MarkT35NormalRip()
+	if not AC.Lib.Buff("阿莎曼之怒") then
+		AC.Combat.t35BurstRipFlag = 0
+	end
+end
+
+local function ShouldHoldT35RipForBurst()
+	return AC.Lib.Buff("阿莎曼之怒") and
+		   AC.Options.t35BurstRip == 1 and
+		   AC.Combat.t35BurstRipFlag == 0
+end
+
+local function T35ModeEnabled(mode, isBoss)
+	return mode == "use" or (mode == "boss" and isBoss)
+end
+
+local function UseT35Trinket(slot, mode, isBoss, isUsable)
+	if GetInventoryItemCooldown("player", slot) ~= 0 then
+		return false
+	end
+	if mode == "force" then
+		UseInventoryItem(slot)
+		return true
+	end
+	if T35ModeEnabled(mode, isBoss) and isUsable then
+		UseInventoryItem(slot)
+		return true
+	end
+	return false
+end
+
+local function HandleT35ForceTrinkets()
+	if AC.Options.t35BurstTrinketUpper == "force" then
+		UseT35Trinket(13, AC.Options.t35BurstTrinketUpper, false, false)
+	end
+	if AC.Options.t35BurstTrinketBelow == "force" then
+		UseT35Trinket(14, AC.Options.t35BurstTrinketBelow, false, false)
+	end
+end
+
+local function HandleT35Burst()
+	if not UnitExists("target") or not UnitCanAttack("player", "target") then
+		return false
+	end
+	if not AC.Lib.Buff("阿莎曼之怒") then
+		return false
+	end
+	if not AC.Lib.IsTargetInRange() then
+		return false
+	end
+
+	local isBoss = AC.Lib.IsBossTarget()
+
+	UseT35Trinket(13, AC.Options.t35BurstTrinketUpper, isBoss, AC.TrinketUsable.upper)
+	UseT35Trinket(14, AC.Options.t35BurstTrinketBelow, isBoss, AC.TrinketUsable.below)
+
+	if T35ModeEnabled(AC.Options.t35BurstBerserk, isBoss) and not AC.Lib.Buff("狂暴") and AC.Lib.SpellReady("狂暴") then
+		CastSpellByName("狂暴")
+		return true
+	end
+
+	if T35ModeEnabled(AC.Options.t35BurstMightyRagePotion, isBoss) and AC.Lib.UseItemByName("强效怒气药水") then
+		return true
+	end
+	if T35ModeEnabled(AC.Options.t35BurstHastePotion, isBoss) and AC.Lib.UseItemByName("加速药水") then
+		return true
+	end
+
+	if not isBoss then
+		return false
+	end
+
+	if not AC.Config.targetBleed then
+		return false
+	end
+
+	local myPower = UnitMana("player")
+	local comboPoints = GetComboPoints("target")
+	local hasPredatorReveal = AC.Lib.Buff("节能施法")
+	local gcdLeft = AC.Lib.GetSpellCooldown("愤怒")
+
+	if gcdLeft > 0.05 then
+		return false
+	end
+
+	if AC.Options.t35BurstRip == 1 and AC.Combat.t35BurstRipFlag == 0 and
+	   comboPoints >= 5 and (myPower >= 30 or hasPredatorReveal) then
+		if Cat and Cat:IsDebugging() then
+			DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Cat Debug:|r T3.5爆发补撕扯，能量=%d，连击点=%d，撕扯flag=%d，节能=%s", myPower, comboPoints, AC.Combat.t35BurstRipFlag, tostring(hasPredatorReveal)))
+		end
+		CastSpellByName("撕扯")
+		return true
+	end
+
+	if AC.Options.t35BurstRake == 1 and AC.Combat.t35BurstRakeFlag == 0 and
+	   (myPower >= AC.Config.rakeEnergy or hasPredatorReveal) and not AC.Lib.Buff("血袭") then
+		if Cat and Cat:IsDebugging() then
+			DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF906d96Cat Debug:|r T3.5爆发补扫击，能量=%d，扫击flag=%d，节能=%s", myPower, AC.Combat.t35BurstRakeFlag, tostring(hasPredatorReveal)))
+		end
+		CastSpellByName("扫击")
+		return true
+	end
+
+	return false
+end
+
 -- 主函数，作为AutoCat表的方法
 AutoCat.Run = function(type)
 
@@ -236,14 +356,9 @@ AutoCat.Run = function(type)
 	-- 开启自动攻击
 	AC.Lib.StartAttack()
 
-	-- 自动开启饰品（使用缓存的可用性检查结果，需要有目标且在近战范围）
-	if AC.Lib.IsTargetInRange() then
-		if GetInventoryItemCooldown("player",13)==0 and AC.Options.trinketUpper==1 and AC.TrinketUsable.upper then
-			UseInventoryItem(13)
-		end
-		if GetInventoryItemCooldown("player",14)==0 and AC.Options.trinketBelow==1 and AC.TrinketUsable.below then
-			UseInventoryItem(14)
-		end
+	-- 饰品只看T3.5爆发设置；非爆发仅处理“无条件使用”。
+	if AC.Lib.IsTargetInRange() and not AC.Lib.Buff("阿莎曼之怒") then
+		HandleT35ForceTrinkets()
 	end
 
 	-- 血量危险时处理，潜行下不吃药
@@ -256,6 +371,10 @@ AutoCat.Run = function(type)
 	-- 献祭之油：战斗中且没有火焰之盾buff时使用
 	if AC.Options.sacrificeOil==1 and combat and not AC.Lib.Buff("火焰之盾") then
 		AC.Lib.UseItemByName("献祭之油")
+	end
+
+	if combat and HandleT35Burst() then
+		return
 	end
 
 	-- 攻击流程
@@ -381,6 +500,7 @@ function AC.Combat.Bleed(useShapeshift)
 
     -- 补撕扯（5星）
     if not ripDot and comboPoints >= 5 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal) then
+        AC.Combat.MarkT35NormalRip()
         CastSpellByName("撕扯")
         AC.Combat.t1 = GetTime()
         return
@@ -388,6 +508,7 @@ function AC.Combat.Bleed(useShapeshift)
 
     -- 非Boss目标1星撕扯
     if not isBoss and not ripDot and comboPoints >= 1 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal) then
+        AC.Combat.MarkT35NormalRip()
         CastSpellByName("撕扯")
         AC.Combat.t1 = GetTime()
         return
@@ -395,12 +516,13 @@ function AC.Combat.Bleed(useShapeshift)
 
     -- 补扫击
     if not rakeDot and (myPower >= AC.Config.rakeEnergy or hasPredatorReveal) and not AC.Lib.Buff("血袭") then
+        AC.Combat.MarkT35NormalRake()
         CastSpellByName("扫击")
         return
     end
 
     -- 凶猛撕咬（满星消耗）
-    if comboPoints >= 5 and myPower >= 35 then
+    if comboPoints >= 5 and myPower >= 35 and not ShouldHoldT35RipForBurst() then
         CastSpellByName("凶猛撕咬")
         return
     end
@@ -597,19 +719,21 @@ function AC.Combat.RendBleed()
 
     -- 补扫击
     if not rakeDot and myPower >= AC.Config.rakeEnergy and not AC.Lib.Buff("血袭") then
+        AC.Combat.MarkT35NormalRake()
         CastSpellByName("扫击")
         return
     end
     
     -- 补撕扯
     if not ripDot and comboPoints > 0 and targetHealth > AC.Options.rendValue and targetMaxHealth > 4000 and (myPower >= 30 or hasPredatorReveal) then
+        AC.Combat.MarkT35NormalRip()
         CastSpellByName("撕扯")
         AC.Combat.rendBleedT1 = GetTime()
         return
     end
     
     -- 凶猛撕咬（满星消耗）
-    if comboPoints >= 5 and myPower >= 35 then
+    if comboPoints >= 5 and myPower >= 35 and not ShouldHoldT35RipForBurst() then
         CastSpellByName("凶猛撕咬")
         return
     end
