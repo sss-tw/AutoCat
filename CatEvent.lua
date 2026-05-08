@@ -335,7 +335,9 @@ function AC.EventHandlers.OnEvent()
                 local _, playerGUID = UnitExists("player")
                 if AC.Combat and arg1 == playerGUID and AC.Lib.Buff("阿莎曼之怒") then
                     AC.Combat.t35BurstRakeFlag = 1
-                    DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r T3.5爆发扫击已确认施放，扫击flag=1")
+                    if Cat and Cat:IsDebugging() then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r T3.5爆发扫击已确认施放，扫击flag=1")
+                    end
                 end
             -- 撕扯
             elseif arg4 == 9896 then
@@ -344,7 +346,9 @@ function AC.EventHandlers.OnEvent()
                 local _, playerGUID = UnitExists("player")
                 if AC.Combat and arg1 == playerGUID and AC.Lib.Buff("阿莎曼之怒") then
                     AC.Combat.t35BurstRipFlag = 1
-                    DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r T3.5爆发撕扯已确认施放，撕扯flag=1")
+                    if Cat and Cat:IsDebugging() then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r T3.5爆发撕扯已确认施放，撕扯flag=1")
+                    end
                 end
             -- 会重置普攻的技能（针对职业：战士）
             -- 英勇打击或顺劈斩
