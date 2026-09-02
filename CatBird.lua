@@ -503,6 +503,10 @@ function Bird:BirdCombatFlow()
 		if targetNatureImmune then
 			return false
 		end
+		-- 绿色亲和虽奥术免疫，但不补虫群
+		if UnitName("target") == "绿色亲和" then
+			return false
+		end
 		if CanDebuff("虫群") then
 			self:EquipIdolForSpell("虫群")
 			CastSpellByName("虫群")
@@ -574,8 +578,11 @@ function Bird:BirdCombatFlow()
 		end
 	end
 	
-	-- 奥术免疫检查：如果目标奥术免疫，只使用愤怒（自然伤害）
+	-- 奥术免疫检查：只使用自然伤害。Boss先补虫群再打愤怒，绿色亲和除外
 	if AC.Config.targetArcaneImmune then
+		if AC.Lib.IsBossTarget() and TrySwarmBeforeWrath("目标奥术免疫") then
+			return
+		end
 		CastWrathOrFallback("目标奥术免疫")
 		if targetNatureImmune then
 			self:DebugPrint("目标奥术免疫且自然免疫：已跳过愤怒")
