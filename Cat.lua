@@ -423,9 +423,23 @@ function AC.Combat.GetTigerFuryRemaining()
     return bleedRemaining, rendBleedRemaining
 end
 
+local function IsEbonrocTarget()
+    if not UnitExists("target") then
+        return false
+    end
+
+    local targetName = UnitName("target")
+    return targetName == "埃博诺克" or targetName == "Ebonroc"
+end
+
 local function CastReshiftAndClearTigerFuryTimer()
+    if IsEbonrocTarget() then
+        return false
+    end
+
     AC.Combat.ClearTigerFuryTimer()
     CastSpellByName("重整")
+    return true
 end
 
 function AC.Combat.Bleed(useShapeshift)
