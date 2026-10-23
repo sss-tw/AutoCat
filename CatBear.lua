@@ -391,10 +391,10 @@ function Bear:PullAll(noTaunt)
 	end
 
 	-- 精灵之火（野性）
-	if AC.Options.bear.timing.faerieFireWild == "ready" and Spell:IsReady("精灵之火（野性）") then
+	if AC.Lib.CanFaerieFire("target") and AC.Options.bear.timing.faerieFireWild == "ready" and Spell:IsReady("精灵之火（野性）") then
 		-- 当法术就绪时：骗节能
 		CastSpellByName("精灵之火（野性）")
-	elseif AC.Options.bear.timing.faerieFireWild == "none" and not Effect:FindName("精灵之火", "target") and Spell:IsReady("精灵之火（野性）") then
+	elseif AC.Lib.CanFaerieFire("target") and AC.Options.bear.timing.faerieFireWild == "none" and not Effect:FindName("精灵之火", "target") and Spell:IsReady("精灵之火（野性）") then
 		-- 当目标无精灵之火时：减护甲
 		CastSpellByName("精灵之火（野性）")
 	-- 狂暴回复

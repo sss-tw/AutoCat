@@ -410,6 +410,10 @@ end
 
 -- 无法流血的怪物列表
 local monsterList = {
+	-- 木喉
+	["裂地者欧曼诺斯"] = true,
+	["欧曼诺斯的颤岩"] = true,
+
 	-- K40
     ["地狱之怒碎片"] = true,
     ["噩梦爬行者"] = true,
@@ -447,17 +451,45 @@ local monsterList = {
 
 	-- TAQ
 
+	-- 黑龙
+	["奥妮克希亚火嗣"] = true,
+
+	-- FX
+	["莫阿姆"] = true,
+
 	-- MC
     ["熔核巨人"] = true,
     ["暗炉卫士"] = true,
     ["暗炉织焰者"] = true,
     ["暗炉圣职者"] = true,
     ["法师领主索瑞森"] = true,
+	["巫王索瑞森"] = true,
 	["熔核摧毁者"] = true,
 
 	-- STSM
 	["安娜丝塔丽男爵夫人"] = true,
 	["埃提耶什"] = true,
+
+	-- 龙吼居所
+	["被遗忘的先祖"] = true,
+	["哈尔甘·红标"] = true,
+
+	-- 黑石深渊
+	["弗莱拉斯大使"] = true,
+	["安格雷尔"] = true,
+	["西斯雷尔"] = true,
+	["多普雷尔"] = true,
+	["格鲁雷尔"] = true,
+	["瓦勒雷尔"] = true,
+	["黑特雷尔"] = true,
+	["杜姆雷尔"] = true,
+	["玛格姆斯"] = true,
+
+	-- 玛拉顿
+	["瑟莱德丝公主"] = true,
+
+	-- 暴风城地牢
+	["戴米安"] = true,
 
 	-- 其他
     ["黑衣守卫斥候"] = true,
@@ -483,6 +515,7 @@ local monsterList = {
     ["鬼魅随从"] = true,
     ["艾德雷斯妖灵"] = true,
     ["天灾勇士"] = true,
+	["天灾卫兵"] = true,
     ["不安宁的阴影"] = true,
     ["不死的看守者"] = true,
     ["哀嚎的鬼怪"] = true,
@@ -490,6 +523,12 @@ local monsterList = {
     ["不死的居民"] = true,
     ["不死的看守者"] = true,
     ["幽灵工人"] = true,
+	["鬼灵工人"] = true,
+	["徘徊的农夫"] = true,
+	["被诅咒的水兵"] = true,
+	["峭壁咆哮者"] = true,
+	["峭壁行者"] = true,
+	["峭壁击碎者"] = true,
 	["古拉巴什狂暴者"] = true,
 	["腐烂古树"] = true,
 	["黑色新娘"] = true,
@@ -504,11 +543,20 @@ local MPmonsterWhiteList = {
 	-- MC
     ["加尔"] = true,
     ["焚化者古雷曼格"] = true,
+	["巴萨尔萨"] = true,
+	["斯摩达利斯"] = true,
+
+	-- 玛拉顿
+	["锐刺鞭笞者"] = true,
 
 	-- World
     ["灌木塑根者"] = true,
     ["灌木露水收集者"] = true,
     ["长瘤的灌木兽"] = true,
+	["焦油潜伏者"] = true,
+	["焦油爬行者"] = true,
+	["焦油兽王"] = true,
+	["焦油兽"] = true,
 }
 
 -- 奥术免疫怪物名单
@@ -527,6 +575,39 @@ local natureImmuneList = {
 	["被污染的胶团"] = true,
 	["落潭"] = true,
 	["魔力亲和"] = true,
+}
+
+-- 精灵之火黑名单
+local faerieFireBlockList = {
+	-- 木喉
+	["被污染的胶团"] = true,
+
+	-- NAXX
+	["鬼灵训练师"] = true,
+	["鬼灵坐骑"] = true,
+	["鬼灵骑兵"] = true,
+
+	-- TAQ
+	["维克洛尔大帝"] = true,
+	["维克尼拉斯大帝"] = true,
+
+	-- BWL
+	["黑翼缚法者"] = true,
+
+	-- 神庙
+	["德拉维沃尔"] = true,
+
+	-- 世界BOSS
+	["桑德兰王子"] = true,
+
+	-- 世界
+	["熔岩元素"] = true,
+	["涅玛丝拉"] = true,
+	["雷霆流放者"] = true,
+	["狂风漩涡"] = true,
+
+	-- 黑石深渊
+	["达格兰·索瑞森大帝"] = true,
 }
 
 -- 检验单位能否流血
@@ -551,6 +632,22 @@ function AC.Lib.CanBleed(unit)
 
 	-- 判断怪物名单
 	if monsterList[name] == true then
+		return false
+	end
+
+	return true
+end
+
+-- 检验单位是否可被施放精灵之火
+function AC.Lib.CanFaerieFire(unit)
+	unit = unit or "target"
+	local name = UnitName(unit)
+
+	if not name then
+		return false
+	end
+
+	if faerieFireBlockList[name] == true then
 		return false
 	end
 

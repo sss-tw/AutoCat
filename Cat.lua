@@ -139,7 +139,7 @@ local function HandleT35ForceTrinkets()
 	end
 end
 
-local function HandleT35Burst()
+local function HandleT35Burst(suppressBleed)
 	if not UnitExists("target") or not UnitCanAttack("player", "target") then
 		return false
 	end
@@ -168,6 +168,10 @@ local function HandleT35Burst()
 	end
 
 	if not isBoss then
+		return false
+	end
+
+	if suppressBleed then
 		return false
 	end
 
@@ -203,6 +207,19 @@ local function HandleT35Burst()
 	end
 
 	return false
+end
+
+local function ShouldUseLowHealthBackstab(combatType)
+	if combatType ~= 1 or AC.Options.lowHealthBackstab ~= 1 then
+		return false
+	end
+	if not UnitExists("target") or UnitIsDead("target") or not UnitCanAttack("player", "target") then
+		return false
+	end
+
+	local targetHealth = UnitHealth("target")
+	local threshold = tonumber(AC.Options.lowHealthBackstabThreshold) or 100000
+	return targetHealth and targetHealth > 0 and targetHealth < threshold
 end
 
 -- 主函数，作为AutoCat表的方法
@@ -297,10 +314,12 @@ AutoCat.Run = function(type)
 		UnitXP("target", "nextEnemyConsideringDistance")
 	end
 
+	local useLowHealthBackstab = ShouldUseLowHealthBackstab(type)
+
 	-- 在潜行状态
 	if isStealthed and isBehind then
 		if AC.Options.pounce == 1 then
-			if AC.Config.targetBleed then
+			if AC.Config.targetBleed and not useLowHealthBackstab then
 				-- 目标可流血用突袭
 				CastSpellByName("突袭")
 				return
@@ -340,7 +359,8 @@ AutoCat.Run = function(type)
 	end
 
 	-- 精灵火开怪：如果有目标、目标身上没有精灵火、不在攻击范围内、精灵火没有CD
-	if AC.Options.faerieFirePull == 1 and UnitExists("target") and UnitCanAttack("player", "target") then
+	if AC.Options.faerieFirePull == 1 and UnitExists("target") and UnitCanAttack("player", "target")
+	   and AC.Lib.CanFaerieFire("target") then
 		local isInRange = AC.Lib.IsTargetInRange()
 		if not AC.Lib.Buff("精灵之火（野性）", "target") and 
 		   not isInRange and 
@@ -373,13 +393,15 @@ AutoCat.Run = function(type)
 		AC.Lib.UseItemByName("献祭之油")
 	end
 
-	if combat and HandleT35Burst() then
+	if combat and HandleT35Burst(useLowHealthBackstab) then
 		return
 	end
 
 	-- 攻击流程
 	if type == 1 then
-		if AC.Config.targetBleed then	-- 目标可流血
+		if useLowHealthBackstab then
+			AC.Combat.Backstab()		-- 目标低血量时停止流血，切换背刺流
+		elseif AC.Config.targetBleed then	-- 目标可流血
 			AC.Combat.Bleed(true)
 		else					-- 目标不可流血
 			AC.Combat.Backstab()
@@ -572,7 +594,8 @@ function AC.Combat.Bleed(useShapeshift)
     end
 
     -- 补精灵之火（能量不足时的填充）
-    if not AC.Lib.Buff("精灵之火（野性）", "target") and 
+    if AC.Lib.CanFaerieFire("target") and
+        not AC.Lib.Buff("精灵之火（野性）", "target") and
         AC.Options.faerieFire == 1 and AC.Lib.SpellReady("精灵之火（野性）") and
         not isStealthed and myPower < 30 then
         CastSpellByName("精灵之火（野性）")
@@ -606,6 +629,7 @@ function AC.Combat.Bleed(useShapeshift)
     -- 能量空挡时补精灵之火
     if myPower < AC.Config.clawEnergy and
        myPower >= AC.Config.clawEnergy - 20 and
+       AC.Lib.CanFaerieFire("target") and
        not AC.Lib.Buff("精灵之火（野性）", "target") and
        AC.Options.faerieFire == 1 and
        AC.Lib.SpellReady("精灵之火（野性）") then
@@ -615,6 +639,8 @@ end
 
 -- 背刺猫攻击流程
 function AC.Combat.Backstab()
+    if not AC.Combat.tigerFuryTimer then AC.Combat.tigerFuryTimer = GetTime() - TIGER_FURY_INTERVAL end
+
     local myPower = UnitMana("player")
     local dmMana = AC.Lib.DriudMana()
     local energyConserve = AC.Event.GetRestoredEnergy()
@@ -629,6 +655,13 @@ function AC.Combat.Backstab()
         if not AC.Lib.CheckInventoryItemName(18, "撕裂神像") then
             UseItemByName("撕裂神像")
         end
+    end
+
+    -- 保持猛虎之怒，与流血流共用固定18秒计时
+    if AC.Options.tigerFury == 1 and myPower >= 30 and (GetTime() - AC.Combat.tigerFuryTimer) >= TIGER_FURY_INTERVAL then
+        CastSpellByName("猛虎之怒")
+        AC.Combat.tigerFuryTimer = GetTime()
+        return
     end
 
     -- 清晰预兆触发时，根据正反面选择撕碎/爪击
@@ -675,6 +708,7 @@ function AC.Combat.Backstab()
 
     -- 能量空挡时补精灵之火
     if myPower < AC.Config.tearEnergy and myPower >= AC.Config.tearEnergy - 20
+       and AC.Lib.CanFaerieFire("target")
        and not AC.Lib.Buff("精灵之火（野性）", "target")
        and AC.Options.faerieFire == 1
        and AC.Lib.SpellReady("精灵之火（野性）") then
@@ -787,7 +821,8 @@ function AC.Combat.RendBleed()
     end
     
     -- 补精灵之火（能量不足时的填充）
-    if not AC.Lib.Buff("精灵之火（野性）", "target") and 
+    if AC.Lib.CanFaerieFire("target") and
+        not AC.Lib.Buff("精灵之火（野性）", "target") and
         AC.Options.faerieFire == 1 and AC.Lib.SpellReady("精灵之火（野性）") and
         myPower < 30 then
         CastSpellByName("精灵之火（野性）")

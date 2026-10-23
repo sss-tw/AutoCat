@@ -21,6 +21,8 @@ local defaultConfig = {
         combat = {
                 -- 技能模式
                 ["type"] = 1,               -- 选择一键宏的技能模式，取值范围(1,2,3,4)
+                low_health_backstab = false, -- 自动模式下目标低血量时切换为背刺流
+                low_health_backstab_threshold = 100000, -- 低血量背刺流触发阈值
                 use_unitxp = true,      -- 是否开启UnitXP，用于强化判断正反面
                 tiger_fury = true,      -- 是否保持猛虎之怒
                 faerie_fire = true,     -- 是否自动补精灵之火
@@ -149,6 +151,8 @@ AutoCat.TrinketUsable = {
 -- 保存配置到AutoCat对象（保持原版结构）
 AutoCat.Options = {
 	["type"] = 1,
+	lowHealthBackstab = 0,
+	lowHealthBackstabThreshold = 100000,
 	useUnitXP = 1,
 	trinketUpper = 0,
 	trinketBelow = 1,
@@ -270,6 +274,31 @@ function Cat:OnInitialize()
 							["bleed"] = "仅双流血",
 							["rend"] = "流血撕碎"
 						}
+					},
+					low_health_backstab = {
+						type = "toggle",
+						name = "低血量转背刺流",
+						desc = "自动选择模式下，目标当前血量低于设定值时停止使用流血技能并切换为背刺流",
+						order = 1.1,
+						get = function() return self.db.profile.combat.low_health_backstab end,
+						set = function(value)
+							self.db.profile.combat.low_health_backstab = value
+							self:ApplyConfig()
+						end
+					},
+					low_health_backstab_threshold = {
+						type = "range",
+						name = "切换背刺血量",
+						desc = "自动选择模式下，目标当前血量低于该值时切换为背刺流",
+						order = 1.2,
+						min = 10000,
+						max = 200000,
+						step = 10000,
+						get = function() return self.db.profile.combat.low_health_backstab_threshold end,
+						set = function(value)
+							self.db.profile.combat.low_health_backstab_threshold = value
+							self:ApplyConfig()
+						end
 					},
 					use_unitxp = {
 						type = "toggle",
@@ -1179,6 +1208,8 @@ function Cat:ApplyConfig()
     -- 更新AutoCat.Options对象
     -- 战斗设置
     AutoCat.Options["type"] = self.db.profile.combat["type"]
+    AutoCat.Options.lowHealthBackstab = self.db.profile.combat.low_health_backstab and 1 or 0
+    AutoCat.Options.lowHealthBackstabThreshold = self.db.profile.combat.low_health_backstab_threshold or 100000
     AutoCat.Options.useUnitXP = self.db.profile.combat.use_unitxp and 1 or 0
     AutoCat.Options.tigerFury = self.db.profile.combat.tiger_fury and 1 or 0
     AutoCat.Options.faerieFire = self.db.profile.combat.faerie_fire and 1 or 0
