@@ -450,7 +450,10 @@ function Bird:BirdCombatFlow()
 	local moonfire = AC.Event.GetMoonfireDot()
 	local isTrashTarget = AC.Lib.IsTrashTarget()
 	local trashNoSwarm = AC.Options.bird.combat.trashOnlyMoonfireWrath and isTrashTarget
-	local targetNatureImmune = AC.Config.targetNatureImmune
+	local ormanosBonusSchool, ormanosBuff = AC.Lib.GetOrmanosDamageBonus()
+	-- 免疫可能在战斗中动态变化，不能使用目标切换时的缓存
+	local targetArcaneImmune = AC.Lib.IsArcaneImmune()
+	local targetNatureImmune = AC.Lib.IsNatureImmune()
 	
 	-- 使用AutoCat的BUFF状态检查
 	local hasBalance = AC.Lib.Buff("万物平衡")
@@ -463,14 +466,14 @@ function Bird:BirdCombatFlow()
 	local mana = UnitMana("player")
 	
 	self:DebugPrint("鸟德攻击流程：目标血量%.1f%%，法力%d，奥术免疫：%s，自然免疫：%s，日蚀：%s，月蚀：%s，昼至：%s，夜至：%s，虫群：%s，月火：%s，自然之赐：%s，万物平衡：%s", 
-		targetHealthPercent, mana, tostring(not not AC.Config.targetArcaneImmune), tostring(not not targetNatureImmune), tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
+		targetHealthPercent, mana, tostring(not not targetArcaneImmune), tostring(not not targetNatureImmune), tostring(not not hasSolarEclipse), tostring(not not hasLunarEclipse), tostring(not not hasDayfall), tostring(not not hasNightfall), tostring(not not swarm), tostring(not not moonfire), tostring(not not AC.Lib.Buff("自然之赐")), tostring(not not hasBalance))
 	
 	-- 可否减益函数（使用AutoCat的DOT检查）
 	local function CanDebuff(name)
 		if name == "虫群" then
 			return not swarm and not targetNatureImmune
 		elseif name == "月火术" then
-			return not moonfire
+			return not moonfire and not targetArcaneImmune
 		end
 		return false
 	end
@@ -578,17 +581,48 @@ function Bird:BirdCombatFlow()
 		end
 	end
 	
+	-- 两种系别都免疫时不施放伤害法术
+	if targetArcaneImmune and targetNatureImmune then
+		self:DebugPrint("目标同时免疫奥术和自然：停止施放伤害法术")
+		return
+	end
+
 	-- 奥术免疫检查：只使用自然伤害。Boss先补虫群再打愤怒，绿色亲和除外
-	if AC.Config.targetArcaneImmune then
+	if targetArcaneImmune then
 		if AC.Lib.IsBossTarget() and TrySwarmBeforeWrath("目标奥术免疫") then
 			return
 		end
 		CastWrathOrFallback("目标奥术免疫")
-		if targetNatureImmune then
-			self:DebugPrint("目标奥术免疫且自然免疫：已跳过愤怒")
-		else
-			self:DebugPrint("目标奥术免疫：只使用愤怒")
+		self:DebugPrint("目标奥术免疫：只使用愤怒")
+		return
+	end
+
+	-- 自然免疫检查：只使用奥术伤害
+	if targetNatureImmune then
+		if TryMoonfireBeforeStarfire("目标自然免疫") then
+			return
 		end
+		self:EquipIdolForSpell("星火术")
+		CastSpellByName("星火术")
+		self:DebugPrint("目标自然免疫：只使用星火术/月火术")
+		return
+	end
+
+	-- 裂地者欧曼诺斯：没有免疫冲突时，优先使用鸟德能够利用的共鸣加成
+	if ormanosBonusSchool == "nature" then
+		if TrySwarmBeforeWrath("欧曼诺斯共鸣") then
+			return
+		end
+		CastWrathOrFallback("欧曼诺斯共鸣")
+		self:DebugPrint("欧曼诺斯共鸣<%s>：只打自然（愤怒/虫群）", ormanosBuff or "")
+		return
+	elseif ormanosBonusSchool == "arcane" then
+		if TryMoonfireBeforeStarfire("欧曼诺斯共鸣") then
+			return
+		end
+		self:EquipIdolForSpell("星火术")
+		CastSpellByName("星火术")
+		self:DebugPrint("欧曼诺斯共鸣<%s>：只打奥术（星火/月火）", ormanosBuff or "")
 		return
 	end
 

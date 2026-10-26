@@ -654,6 +654,45 @@ function AC.Lib.CanFaerieFire(unit)
 	return true
 end
 
+-- 鸟德可以利用的欧曼诺斯共鸣伤害加成
+local ormanosDamageBonus = {
+	["板岩的共鸣"] = "arcane",
+	["花岗岩的共鸣"] = "nature",
+}
+
+function AC.Lib.GetOrmanosDamageBonus(unit)
+	unit = unit or "target"
+	if UnitName(unit) ~= "裂地者欧曼诺斯" then
+		return nil
+	end
+
+	local i = 1
+	while true do
+		local found, name = AC.Lib.GetBuffNameByIndex(unit, i)
+		if not found then
+			break
+		end
+		if ormanosDamageBonus[name] then
+			return ormanosDamageBonus[name], name
+		end
+		i = i + 1
+	end
+
+	i = 1
+	while true do
+		local found, name = AC.Lib.GetDebuffNameByIndex(unit, i)
+		if not found then
+			break
+		end
+		if ormanosDamageBonus[name] then
+			return ormanosDamageBonus[name], name
+		end
+		i = i + 1
+	end
+
+	return nil
+end
+
 -- 检验单位是否奥术免疫
 function AC.Lib.IsArcaneImmune(unit)
 	unit = unit or "target"
@@ -663,8 +702,12 @@ function AC.Lib.IsArcaneImmune(unit)
 		return false
 	end
 
-	-- 只检查奥术免疫名单
 	if arcaneImmuneList[name] == true then
+		return true
+	end
+
+	-- 大理石共鸣会使裂地者欧曼诺斯免疫奥术伤害
+	if name == "裂地者欧曼诺斯" and AC.Lib.Buff("大理石的共鸣", unit) then
 		return true
 	end
 
@@ -680,8 +723,12 @@ function AC.Lib.IsNatureImmune(unit)
 		return false
 	end
 
-	-- 只检查自然免疫名单
 	if natureImmuneList[name] == true then
+		return true
+	end
+
+	-- 石英共鸣会使裂地者欧曼诺斯免疫自然伤害
+	if name == "裂地者欧曼诺斯" and AC.Lib.Buff("石英的共鸣", unit) then
 		return true
 	end
 
