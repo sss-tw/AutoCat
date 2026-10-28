@@ -5,7 +5,7 @@
 -- 感谢：妖姬变 树先生 Crazydru
 -- 有问题游戏里或者kook-德鲁伊频道交流
 --
--- 可选模组：SuperWoW UnitXP_SP3 Interact cat
+-- 可选模组：Nampower UnitXP_SP3 Interact cat
 --
 -- 说明：
 -- 全自动判断->目标是否吃流血->目标正反面朝向
@@ -835,7 +835,15 @@ SLASH_AUTOCAT2 = "/AutoCat"
 
 -- 处理斜杠命令
 SlashCmdList["AUTOCAT"] = function(msg)
-    if msg == "debug on" then
+    if msg == "config" or msg == "settings" or msg == "设置" then
+        if AutoCatSettingsUI then
+            AutoCatSettingsUI:Toggle()
+        end
+    elseif msg == "help" or msg == "?" then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00AutoCat:|r /autocat config - 打开设置画面")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00AutoCat:|r /autocat [1-4] - 执行指定战斗模式")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00AutoCat:|r /autocat debug on|off - 调试开关")
+    elseif msg == "debug on" then
         Cat:SetDebugging(true)
     elseif msg == "debug off" then
         Cat:SetDebugging(false)  

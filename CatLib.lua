@@ -232,8 +232,8 @@ end
 
 -- 德鲁伊变形后的蓝获取
 function AC.Lib.DriudMana()
-	-- 具有SuperWoW的时候，通过API获取
-	if AC.Event.superWowEnabled then
+	-- Nampower扩展了变形状态下 UnitMana 的返回值。
+	if AC.Event.nampowerEnabled then
 		local e,m = UnitMana("player")
 		if not m then
 			return AC.Config.manaValue

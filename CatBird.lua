@@ -38,14 +38,14 @@ function Bird:IsDebugging()
 end
 
 -- 调试输出函数（简化版，无等级）
-function Bird:DebugPrint(message, ...)
+function Bird:DebugPrint(message, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10, value11, value12)
 	if not self:IsDebugging() then
 		return
 	end
 	
 	local formattedMessage
-	if message and arg and getn(arg) > 0 then
-		formattedMessage = string.format(message, unpack(arg))
+	if message and value1 ~= nil then
+		formattedMessage = string.format(message, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10, value11, value12)
 	else
 		formattedMessage = tostring(message or "")
 	end
@@ -825,7 +825,8 @@ function Bird:GetHighestSpellSlotByName(spellName)
 		if name == spellName then
 			local rankNumber = -1
 			if rankText then
-				local n = tonumber(string.match(rankText, "(%d+)"))
+				local _, _, rankNumber = string.find(rankText, "(%d+)")
+				local n = tonumber(rankNumber)
 				if n then
 					rankNumber = n
 				end

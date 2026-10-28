@@ -80,7 +80,10 @@ local UnitXP_SP3 = pcall(UnitXP, "nop", "nop");
 
 -- 事件相关变量
 AC.Event.UnitXP_SP3 = UnitXP_SP3 -- 暴露UnitXP可用性到命名空间
-AC.Event.superWowEnabled = false -- SuperWow模组是否启用
+AC.Event.nampowerEnabled = false -- Nampower模组是否启用
+AC.Event.nampowerMajor = 0
+AC.Event.nampowerMinor = 0
+AC.Event.nampowerPatch = 0
 AC.Event.errorBehind = true -- 是否能打背标记变量
 AC.Event.errorBehindTimer = 0 -- 背标记计时器
 AC.Event.castStartTime = {} -- 施法计时器
@@ -112,6 +115,18 @@ AC.Event.dotDurationDelay = 0.08 -- 新增：网络延迟补偿
 -- 创建一个 Frame 并监听事件
 local frame = CreateFrame("Frame")
 
+local function RegisterOptionalEvent(eventName)
+	return pcall(frame.RegisterEvent, frame, eventName)
+end
+
+local function GetUnitGuid(unit)
+	local exists, guid = UnitExists(unit)
+	if exists then
+		return guid
+	end
+	return nil
+end
+
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("UI_ERROR_MESSAGE")
@@ -124,6 +139,7 @@ frame:RegisterEvent("SPELLCAST_FAILED")
 frame:RegisterEvent("SPELLCAST_INTERRUPTED")
 frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 frame:RegisterEvent("PLAYER_AURAS_CHANGED")
+frame:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE")
 frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 frame:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
 
@@ -134,12 +150,9 @@ frame:RegisterEvent("UNIT_AURA")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
--- 熊德通报相关事件（这些是AceLibrary事件，需要通过Cat addon注册）
--- SpellStatus和SpecialEvents事件将在Bear模块初始化时注册
-
--- SuperWow专有事件
-frame:RegisterEvent("UNIT_CASTEVENT")
-frame:RegisterEvent("RAW_COMBATLOG")
+-- Nampower结构化事件；未安装时安全忽略注册失败。
+RegisterOptionalEvent("UNIT_CASTEVENT")
+RegisterOptionalEvent("SPELL_MISS_SELF")
 
 
 
@@ -149,22 +162,25 @@ function AC.EventHandlers.OnEvent()
     if event == "PLAYER_LOGIN" then
         -- 简化加载信息
 
-        -- SuperWoW检查（静默）
-        if SUPERWOW_STRING then
-            AC.Event.superWowEnabled = true
+        -- Nampower检查与结构化事件开关
+        if type(GetNampowerVersion) == "function" then
+            local major, minor, patch = GetNampowerVersion()
+            AC.Event.nampowerEnabled = true
+            AC.Event.nampowerMajor = tonumber(major) or 0
+            AC.Event.nampowerMinor = tonumber(minor) or 0
+            AC.Event.nampowerPatch = tonumber(patch) or 0
+            if AC.Event.nampowerMajor >= 4 then
+                SetCVar("NP_EnableAutoAttackEvents", "1")
+                SetCVar("NP_EnableAuraCastEvents", "1")
+                SetCVar("NP_EnableSpellGoEvents", "1")
+                SetCVar("NP_EnableSpellStartEvents", "1")
+            end
         end
 
-        -- UnitXP和等级检查（静默）
-        -- 确保Ace插件初始化
+        -- 初始化内部配置与职业模块。
         if Cat then
             Cat:OnInitialize()
         end
-        
-        -- 熊德模块初始化
-        if AC.Bear and AC.Bear.Initialize then
-            AC.Bear:Initialize()
-        end
-        
 
     -- 进入游戏世界刷新常量值
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -291,6 +307,9 @@ function AC.EventHandlers.OnEvent()
         if AC.Combat and AC.Combat.ClearTigerFuryTimer and not AC.Lib.GetShape(3) then
             AC.Combat.ClearTigerFuryTimer()
         end
+        if event == "PLAYER_AURAS_CHANGED" and AC.Bear and AC.Bear.UpdateReportBuffs then
+            AC.Bear:UpdateReportBuffs(false)
+        end
     
     -- 鸟德Eclipse状态跟踪
     elseif event == "UNIT_AURA" then
@@ -327,12 +346,25 @@ function AC.EventHandlers.OnEvent()
                 AC.Event.castStartTime[arg1] = nil
             end
 
+            local playerGUID = GetUnitGuid("player")
+            if arg1 == playerGUID and AC.Bear and AC.Bear.OnPlayerSpellCast then
+                local spellName
+                if type(GetSpellNameAndRankForId) == "function" then
+                    spellName = GetSpellNameAndRankForId(arg4)
+                end
+                if not spellName and type(SpellInfo) == "function" then
+                    spellName = SpellInfo(arg4)
+                end
+                if spellName then
+                    AC.Bear:OnPlayerSpellCast(spellName)
+                end
+            end
+
             -- 监控双流血
             -- 扫击
-            if arg4 == 9904 then
+            if arg1 == playerGUID and arg2 and arg4 == 9904 then
                 AC.Event.rakeDelayTime[arg2] = GetTime()
                 AC.Event.lastRakeTime = GetTime() -- 记录上次扫击时间
-                local _, playerGUID = UnitExists("player")
                 if AC.Combat and arg1 == playerGUID and AC.Lib.Buff("阿莎曼之怒") then
                     AC.Combat.t35BurstRakeFlag = 1
                     if Cat and Cat:IsDebugging() then
@@ -340,10 +372,9 @@ function AC.EventHandlers.OnEvent()
                     end
                 end
             -- 撕扯
-            elseif arg4 == 9896 then
+            elseif arg1 == playerGUID and arg2 and arg4 == 9896 then
                 AC.Event.ripDelayTime[arg2] = GetTime()
                 AC.Event.lastRipTime = GetTime() -- 记录上次撕扯时间
-                local _, playerGUID = UnitExists("player")
                 if AC.Combat and arg1 == playerGUID and AC.Lib.Buff("阿莎曼之怒") then
                     AC.Combat.t35BurstRipFlag = 1
                     if Cat and Cat:IsDebugging() then
@@ -370,44 +401,32 @@ function AC.EventHandlers.OnEvent()
             AC.Event.mainHandDuration = UnitAttackSpeed("player")
         end
 
-
-
-
--- SpellStatus_SpellCastInstant 和 SpecialEvents_UnitBuffGained 事件
--- 现在通过AceEvent在CatBear.lua中直接注册和处理
-
--- 战斗日志事件处理
-elseif event == "RAW_COMBATLOG" then
-
-    -- 分发给熊德模块处理
-    if AC.Bear and AC.Bear.OnRawCombatLog then
-        AC.Bear:OnRawCombatLog(arg1, arg2, arg3, arg4, arg5)
-    end
-
-    -- 攻击
-    if arg1 == "CHAT_MSG_SPELL_SELF_DAMAGE" then
-
-        if string.find( arg2, "你的扫击.*招架.*" ) or string.find( arg2, "你的扫击.*躲闪.*" ) or string.find( arg2, "你的扫击.*格挡.*" ) or string.find( arg2, "你的扫击.*没有击中.*" ) then
-            local targetGUID = string.match(arg2,"0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x")
-            if AC.Event.rakeDelayTime[targetGUID] then
-                local timer = GetTime() - AC.Event.rakeDelayTime[targetGUID]
-                if timer <= AC.Event.bleenCheckDelay then
-                    AC.Event.rakeDelayTime[targetGUID] = nil
-                end
-            end
+    -- Nampower 2.31+ 的结构化未命中事件：
+    -- arg1=施法者GUID，arg2=目标GUID，arg3=技能ID，arg4=未命中类型。
+    elseif event == "SPELL_MISS_SELF" then
+        if arg2 and arg3 == 9904 then
+            AC.Event.rakeDelayTime[arg2] = nil
+        elseif arg2 and arg3 == 9896 then
+            AC.Event.ripDelayTime[arg2] = nil
         end
 
-        if string.find( arg2, "你的撕扯.*招架.*" ) or string.find( arg2, "你的撕扯.*躲闪.*" ) or string.find( arg2, "你的撕扯.*格挡.*" ) or string.find( arg2, "你的撕扯.*没有击中.*" ) then
-            local targetGUID = string.match(arg2,"0x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x")
-            if AC.Event.ripDelayTime[targetGUID] then
-                local timer = GetTime() - AC.Event.ripDelayTime[targetGUID]
-                if timer <= AC.Event.bleenCheckDelay then
-                    AC.Event.ripDelayTime[targetGUID] = nil
-                end
-            end
+    -- 兼容不提供 SPELL_MISS_SELF 的旧版 Nampower。
+    elseif event == "CHAT_MSG_SPELL_SELF_DAMAGE" and AC.Event.nampowerEnabled then
+        local targetGUID = GetUnitGuid("target")
+        if targetGUID and
+            (string.find(arg1 or "", "你的扫击.*招架.*")
+            or string.find(arg1 or "", "你的扫击.*躲闪.*")
+            or string.find(arg1 or "", "你的扫击.*格挡.*")
+            or string.find(arg1 or "", "你的扫击.*没有击中.*")) then
+            AC.Event.rakeDelayTime[targetGUID] = nil
+        elseif targetGUID and
+            (string.find(arg1 or "", "你的撕扯.*招架.*")
+            or string.find(arg1 or "", "你的撕扯.*躲闪.*")
+            or string.find(arg1 or "", "你的撕扯.*格挡.*")
+            or string.find(arg1 or "", "你的撕扯.*没有击中.*")) then
+            AC.Event.ripDelayTime[targetGUID] = nil
         end
     end
-end
 end
 
 local interval = 0.05  -- 轮询间隔（秒）
@@ -458,16 +477,16 @@ end
 -- 获取当前目标是否有扫击效果
 -- 注：优先使用Cursive插件，其次SuperWow支持更加准确
 function AC.Event.GetRakeDot()
-    -- 优先检测是否有Cursive插件（需要SuperWow支持获取GUID）
-    if Cursive and Cursive.curses and AC.Event.superWowEnabled then
+    -- 优先检测是否有Cursive插件（需要Nampower支持获取GUID）
+    if Cursive and Cursive.curses and AC.Event.nampowerEnabled then
         local a, guid = UnitExists("target")
         if guid then
             return Cursive.curses:HasCurse("扫击", guid)
         end
     end
 
-    -- 检测是否有SuperWow模组
-    if not AC.Event.superWowEnabled then
+    -- 未安装Nampower时使用原生光环检测降级。
+    if not AC.Event.nampowerEnabled then
         local hasRakeBuff = AC.Lib.Buff("扫击", "target")
         -- 如果没有扫击buff且上次扫击超过5秒，返回false强制补扫击
         if not hasRakeBuff and (GetTime() - AC.Event.lastRakeTime) > 5 then
@@ -518,16 +537,16 @@ end
 -- 获取当前目标是否有撕扯效果
 -- 注：优先使用Cursive插件，其次SuperWow支持更加准确
 function AC.Event.GetRipDot()
-    -- 优先检测是否有Cursive插件（需要SuperWow支持获取GUID）
-    if Cursive and Cursive.curses and AC.Event.superWowEnabled then
+    -- 优先检测是否有Cursive插件（需要Nampower支持获取GUID）
+    if Cursive and Cursive.curses and AC.Event.nampowerEnabled then
         local a, guid = UnitExists("target")
         if guid then
             return Cursive.curses:HasCurse("撕扯", guid)
         end
     end
 
-    -- 检测是否有SuperWow模组
-    if not AC.Event.superWowEnabled then
+    -- 未安装Nampower时使用原生光环检测降级。
+    if not AC.Event.nampowerEnabled then
         local hasRipBuff = AC.Lib.Buff("撕扯", "target")
         -- 如果没有撕扯buff且上次撕扯超过10秒，返回false强制补撕扯
         if not hasRipBuff and (GetTime() - AC.Event.lastRipTime) > 10 then
@@ -603,8 +622,8 @@ end
 -- 获取目标是否正在施法
 -- 注：需要SuperWow支持
 function AC.Event.TargetCast()
-    -- 检测是否有SuperWow模组
-    if not AC.Event.superWowEnabled then
+    -- Nampower不可用时无法获得目标的结构化施法状态。
+    if not AC.Event.nampowerEnabled then
         return false
     end
 
@@ -719,16 +738,16 @@ end
 -- 获取当前目标是否有月火术效果（鸟德用）
 -- 注：优先使用Cursive插件，其次SuperWow支持更加准确
 function AC.Event.GetMoonfireDot()
-    -- 优先检测是否有Cursive插件（需要SuperWow支持获取GUID）
-    if Cursive and Cursive.curses and AC.Event.superWowEnabled then
+    -- 优先检测是否有Cursive插件（需要Nampower支持获取GUID）
+    if Cursive and Cursive.curses and AC.Event.nampowerEnabled then
         local a, guid = UnitExists("target")
         if guid then
             return Cursive.curses:HasCurse("月火术", guid)
         end
     end
 
-    -- 检测是否有SuperWow模组
-    if not AC.Event.superWowEnabled then
+    -- 未安装Nampower时使用原生光环检测降级。
+    if not AC.Event.nampowerEnabled then
         local hasMoonfireBuff = AC.Lib.Buff("月火术", "target")
         -- 如果没有月火术buff且上次月火术超过18秒，返回false强制补月火术
         if not hasMoonfireBuff and AC.Event.lastMoonfireTime and (GetTime() - AC.Event.lastMoonfireTime) > 18 then
@@ -779,16 +798,16 @@ end
 -- 获取当前目标是否有虫群效果（鸟德用）
 -- 注：优先使用Cursive插件，其次SuperWow支持更加准确
 function AC.Event.GetSwarmDot()
-    -- 优先检测是否有Cursive插件（需要SuperWow支持获取GUID）
-    if Cursive and Cursive.curses and AC.Event.superWowEnabled then
+    -- 优先检测是否有Cursive插件（需要Nampower支持获取GUID）
+    if Cursive and Cursive.curses and AC.Event.nampowerEnabled then
         local a, guid = UnitExists("target")
         if guid then
             return Cursive.curses:HasCurse("虫群", guid)
         end
     end
 
-    -- 检测是否有SuperWow模组
-    if not AC.Event.superWowEnabled then
+    -- 未安装Nampower时使用原生光环检测降级。
+    if not AC.Event.nampowerEnabled then
         local hasSwarmBuff = AC.Lib.Buff("虫群", "target")
         -- 如果没有虫群buff且上次虫群超过18秒，返回false强制补虫群
         if not hasSwarmBuff and AC.Event.lastSwarmTime and (GetTime() - AC.Event.lastSwarmTime) > 18 then

@@ -14,14 +14,14 @@ function AC.Healer.GetDebugLevel()
 	return Cat and Cat:GetDebugLevel() or 2
 end
 
-function AC.Healer.DebugPrint(level, message, ...)
+function AC.Healer.DebugPrint(level, message, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10, value11, value12)
 	if not AC.Healer.IsDebugging() or level > AC.Healer.GetDebugLevel() then
 		return
 	end
 	
 	local formattedMessage
-	if message and arg and getn(arg) > 0 then
-		formattedMessage = string.format(message, unpack(arg))
+	if message and value1 ~= nil then
+		formattedMessage = string.format(message, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10, value11, value12)
 	else
 		formattedMessage = tostring(message or "")
 	end
@@ -603,7 +603,7 @@ function AC.Healer.Heal()
     
     -- 获取所有治疗目标，按优先级排序
     local targets = AC.Healer.GetHealTargets()
-    if getn(targets) == 0 then
+    if table.getn(targets) == 0 then
         if AC.Healer.IsDebugging() then
             AC.Healer.DebugPrint(2, "没有找到需要治疗的目标")
         end
@@ -620,7 +620,7 @@ end
 
 -- 新增：异步治疗目标处理函数
 function AC.Healer.TryHealTargets(targets, index)
-    if index > getn(targets) then
+    if index > table.getn(targets) then
         -- 所有目标都尝试完了，清除异步状态
         AC.Healer.isAsyncHealing = false
         if AC.Healer.IsDebugging() then
@@ -630,7 +630,7 @@ function AC.Healer.TryHealTargets(targets, index)
     end
     
     if AC.Healer.IsDebugging() then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r |cFFf9cdfd准备处理目标 "..index.." / "..getn(targets).."|r")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Debug:|r |cFFf9cdfd准备处理目标 "..index.." / "..table.getn(targets).."|r")
     end
     
     -- 检查是否仍在施法中
@@ -709,7 +709,7 @@ SlashCmdList["HEALREJ"] = function(msg)
         -- 默认执行治疗
         AC.Healer.Heal()
     else
-        local command, param = string.match(msg, "^(%S+)%s*(.*)$")
+        local _, _, command, param = string.find(msg, "^(%S+)%s*(.*)$")
         command = string.lower(command or "")
         
         if command == "rank" then
@@ -734,7 +734,7 @@ DEFAULT_CHAT_FRAME:AddMessage("|cFF906d96Cat Tip:|r |cFFf9cdfd治疗模块已加
 
 -- 改进的错误消息处理：参考QuickHeal的分类机制
 local originalUIErrorsFrame_OnEvent = UIErrorsFrame_OnEvent
-UIErrorsFrame_OnEvent = function(...)
+UIErrorsFrame_OnEvent = function()
     -- 记录错误时间
     AC.Healer.lastErrorTime = GetTime()
     
@@ -777,7 +777,7 @@ UIErrorsFrame_OnEvent = function(...)
                 AC.Healer.DebugPrint(2, "法力不足，暂停治疗")
             end
             AC.Healer.pendingCast = nil
-            return originalUIErrorsFrame_OnEvent(unpack(arg))
+            return originalUIErrorsFrame_OnEvent()
         elseif string.find(errorMsg, "冷却") or string.find(errorMsg, "cooldown") or
                string.find(errorMsg, "正在冷却") or string.find(errorMsg, "Spell is not ready yet") then
             errorType = "cooldown"
@@ -838,7 +838,7 @@ UIErrorsFrame_OnEvent = function(...)
     end
     
     -- 调用原始函数
-    return originalUIErrorsFrame_OnEvent(unpack(arg))
+    return originalUIErrorsFrame_OnEvent()
 end
 
 -- 创建事件监听帧

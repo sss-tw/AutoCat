@@ -1,19 +1,5 @@
--- 定义插件
-Cat = AceLibrary("AceAddon-2.0"):new(
-        -- 控制台
-        "AceConsole-2.0",
-        -- 调试
-        "AceDebug-2.0", 
-        -- 数据库
-        "AceDB-2.0",
-        -- 事件
-        "AceEvent-2.0",
-        -- 小地图菜单
-        "FuBarPlugin-2.0"
-)
-
--- 提示操作
-local Tablet = AceLibrary("Tablet-2.0")
+-- 插件核心对象由 Core.lua 创建，不再依赖 Ace2。
+Cat = Cat or {}
 
 -- 默认配置
 local defaultConfig = {
@@ -209,21 +195,6 @@ function Cat:OnInitialize()
 	
 	-- 应用配置
 	self:ApplyConfig()
-	
-	-- 具有图标
-	self.hasIcon = true
-	-- 小地图图标
-	self:SetIcon("Interface\\Icons\\Ability_Druid_CatForm")
-	-- 默认位置
-	self.defaultPosition = "LEFT"
-	-- 默认小地图位置
-	self.defaultMinimapPosition = 210
-	-- 无法分离提示（标签）
-	self.cannotDetachTooltip = false
-	-- 角色独立配置
-	self.independentProfile = true
-	-- 挂载时是否隐藏
-	self.hideWithoutStandby = false
 	
 	-- 注册菜单项 - 四大分组：猫德、熊德、治疗、共通
 	self.OnMenuRequest = {
@@ -951,10 +922,10 @@ function Cat:OnInitialize()
 					report_low_roar = {
 						type = "toggle",
 						name = "通报低吼",
-						desc = "施放低吼后是否通报",
+						desc = "施放低吼后是否喊话通报",
 						order = 24,
 						get = function() return self.db.profile.bear.report["低吼"] end,
-						set = function(value) 
+						set = function(value)
 							self.db.profile.bear.report["低吼"] = value
 							self:ApplyConfig()
 						end
@@ -1153,14 +1124,17 @@ function Cat:OnInitialize()
 						name = "调试设置",
 						order = 12,
 					},
-					superwow_status = {
+					nampower_status = {
 						type = "text",
-						name = "SuperWoW模组状态",
-						desc = "显示SuperWoW模组是否成功导入",
+						name = "Nampower模组状态",
+						desc = "显示Nampower模组是否成功导入",
 						order = 13,
 						get = function() 
-					if SUPERWOW_STRING then
-						return "已导入 (" .. (SUPERWOW_VERSION or "未知版本") .. ")"
+							if AutoCat.Event and AutoCat.Event.nampowerEnabled then
+								return "已导入 (" ..
+									AutoCat.Event.nampowerMajor .. "." ..
+									AutoCat.Event.nampowerMinor .. "." ..
+									AutoCat.Event.nampowerPatch .. ")"
 							else
 								return "未导入"
 							end
@@ -1301,10 +1275,6 @@ function Cat:ApplyConfig()
 end
 
 function Cat:OnEnable()
-end
-
-function Cat:OnTooltipUpdate()
-	Tablet:SetHint("点击打开设置菜单")
 end
 
 function Cat:OnDisable()
