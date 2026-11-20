@@ -315,11 +315,12 @@ AutoCat.Run = function(type)
 	end
 
 	local useLowHealthBackstab = ShouldUseLowHealthBackstab(type)
+	local avoidDots = AC.Lib.ShouldAvoidDots("target")
 
 	-- 在潜行状态
 	if isStealthed and isBehind then
 		if AC.Options.pounce == 1 then
-			if AC.Config.targetBleed and not useLowHealthBackstab then
+			if AC.Config.targetBleed and not useLowHealthBackstab and not avoidDots then
 				-- 目标可流血用突袭
 				CastSpellByName("突袭")
 				return
@@ -393,12 +394,14 @@ AutoCat.Run = function(type)
 		AC.Lib.UseItemByName("献祭之油")
 	end
 
-	if combat and HandleT35Burst(useLowHealthBackstab) then
+	if combat and HandleT35Burst(useLowHealthBackstab or avoidDots) then
 		return
 	end
 
 	-- 攻击流程
-	if type == 1 then
+	if avoidDots then
+		AC.Combat.Backstab()
+	elseif type == 1 then
 		if useLowHealthBackstab then
 			AC.Combat.Backstab()		-- 目标低血量时停止流血，切换背刺流
 		elseif AC.Config.targetBleed then	-- 目标可流血

@@ -577,6 +577,12 @@ local natureImmuneList = {
 	["魔力亲和"] = true,
 }
 
+-- 不使用持续伤害技能的目标
+local noDotList = {
+	["血领主曼多基尔"] = true,
+	["Bloodlord Mandokir"] = true,
+}
+
 -- 精灵之火黑名单
 local faerieFireBlockList = {
 	-- 木喉
@@ -610,12 +616,23 @@ local faerieFireBlockList = {
 	["达格兰·索瑞森大帝"] = true,
 }
 
+-- 检验是否应避免对目标使用持续伤害技能
+function AC.Lib.ShouldAvoidDots(unit)
+	unit = unit or "target"
+	local name = UnitName(unit)
+	return name and noDotList[name] == true or false
+end
+
 -- 检验单位能否流血
 function AC.Lib.CanBleed(unit)
 	unit = unit or "target"
 	local name = UnitName(unit)
 
 	if not name then
+		return false
+	end
+
+	if AC.Lib.ShouldAvoidDots(unit) then
 		return false
 	end
 

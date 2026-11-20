@@ -450,6 +450,7 @@ function Bird:BirdCombatFlow()
 	local moonfire = AC.Event.GetMoonfireDot()
 	local isTrashTarget = AC.Lib.IsTrashTarget()
 	local trashNoSwarm = AC.Options.bird.combat.trashOnlyMoonfireWrath and isTrashTarget
+	local avoidDots = AC.Lib.ShouldAvoidDots("target")
 	local ormanosBonusSchool, ormanosBuff = AC.Lib.GetOrmanosDamageBonus()
 	-- 免疫可能在战斗中动态变化，不能使用目标切换时的缓存
 	local targetArcaneImmune = AC.Lib.IsArcaneImmune()
@@ -470,6 +471,9 @@ function Bird:BirdCombatFlow()
 	
 	-- 可否减益函数（使用AutoCat的DOT检查）
 	local function CanDebuff(name)
+		if avoidDots then
+			return false
+		end
 		if name == "虫群" then
 			return not swarm and not targetNatureImmune
 		elseif name == "月火术" then
