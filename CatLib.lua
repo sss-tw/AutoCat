@@ -771,6 +771,25 @@ function AC.Lib.IsTargetInRange()
 	end
 end
 
+-- 检查玩家是否在移动（需要UnitXP SP3或Nampower，都没有时视为未移动）
+function AC.Lib.IsPlayerMoving()
+	if AC.Event.UnitXP_SP3 then
+		local succeeded, speed = pcall(UnitXP, "speed", "player")
+		if succeeded and (tonumber(speed) or 0) > 0.01 then
+			return true
+		end
+	end
+
+	if AC.Event.nampowerEnabled and type(PlayerIsMoving) == "function" then
+		local succeeded, moving = pcall(PlayerIsMoving)
+		if succeeded and moving == 1 then
+			return true
+		end
+	end
+
+	return false
+end
+
 -- 统一的目标类型判断函数
 function AC.Lib.GetTargetType()
 	if not UnitExists("target") then

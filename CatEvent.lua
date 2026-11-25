@@ -796,13 +796,16 @@ function AC.Event.GetMoonfireDotCheck(guid)
 end
 
 -- 获取当前目标是否有虫群效果（鸟德用）
+-- minRemaining: 可选，剩余时间不足该秒数时视为没有虫群
 -- 注：优先使用Cursive插件，其次SuperWow支持更加准确
-function AC.Event.GetSwarmDot()
+function AC.Event.GetSwarmDot(minRemaining)
+    minRemaining = minRemaining or 0
+
     -- 优先检测是否有Cursive插件（需要Nampower支持获取GUID）
     if Cursive and Cursive.curses and AC.Event.nampowerEnabled then
         local a, guid = UnitExists("target")
         if guid then
-            return Cursive.curses:HasCurse("虫群", guid)
+            return Cursive.curses:HasCurse("虫群", guid, minRemaining)
         end
     end
 
@@ -811,6 +814,11 @@ function AC.Event.GetSwarmDot()
         local hasSwarmBuff = AC.Lib.Buff("虫群", "target")
         -- 如果没有虫群buff且上次虫群超过18秒，返回false强制补虫群
         if not hasSwarmBuff and AC.Event.lastSwarmTime and (GetTime() - AC.Event.lastSwarmTime) > 18 then
+            return false
+        end
+        -- 原生光环拿不到剩余时间，只能按自己上次施放时间估算
+        if hasSwarmBuff and minRemaining > 0 and AC.Event.lastSwarmTime and
+            (18 - (GetTime() - AC.Event.lastSwarmTime)) < minRemaining then
             return false
         end
         return hasSwarmBuff
@@ -827,14 +835,14 @@ function AC.Event.GetSwarmDot()
         local timer = GetTime() - AC.Event.swarmDelayTime[guid]
         if timer <= AC.Event.bleenCheckDelay then
             -- 还在等待认证期
-            return AC.Event.GetSwarmDotCheck(guid)
+            return AC.Event.GetSwarmDotCheck(guid, minRemaining)
         else
             -- 已经过了认证期
             AC.Event.swarmCheck[guid] = AC.Event.swarmDelayTime[guid]
         end
     end
 
-    local hasSwarm = AC.Event.GetSwarmDotCheck(guid)
+    local hasSwarm = AC.Event.GetSwarmDotCheck(guid, minRemaining)
     
     -- 兜底逻辑：如果SuperWow检测不到虫群且上次虫群超过18秒，强制返回false
     if not hasSwarm and AC.Event.lastSwarmTime and (GetTime() - AC.Event.lastSwarmTime) > 18 then
@@ -844,10 +852,11 @@ function AC.Event.GetSwarmDot()
     return hasSwarm
 end
 
-function AC.Event.GetSwarmDotCheck(guid)
+function AC.Event.GetSwarmDotCheck(guid, minRemaining)
+    minRemaining = minRemaining or 0
     if AC.Event.swarmCheck and AC.Event.swarmCheck[guid] then
         local timer = GetTime() - AC.Event.swarmCheck[guid]
-        if timer < (18 - AC.Event.dotDurationDelay) then -- 虫群持续18秒
+        if timer < (18 - AC.Event.dotDurationDelay - minRemaining) then -- 虫群持续18秒
             return true
         end
     end

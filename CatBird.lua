@@ -591,6 +591,26 @@ function Bird:BirdCombatFlow()
 		return
 	end
 
+	-- 移动中读条会失败：打月火；奥术免疫时改补虫群，虫群剩余超过一半（9秒）则不补
+	if AC.Lib.IsPlayerMoving() then
+		if avoidDots then
+			self:DebugPrint("移动中：目标不打DoT，跳过")
+		elseif not targetArcaneImmune then
+			self:EquipIdolForSpell("月火术")
+			CastSpellByName("月火术")
+			AC.Event.lastMoonfireTime = GetTime()
+			self:DebugPrint("移动中：月火术")
+		elseif not trashNoSwarm and UnitName("target") ~= "绿色亲和" and not AC.Event.GetSwarmDot(9) then
+			self:EquipIdolForSpell("虫群")
+			CastSpellByName("虫群")
+			AC.Event.lastSwarmTime = GetTime()
+			self:DebugPrint("移动中：目标奥术免疫，补虫群")
+		else
+			self:DebugPrint("移动中：目标奥术免疫，不补虫群")
+		end
+		return
+	end
+
 	-- 奥术免疫检查：只使用自然伤害。Boss先补虫群再打愤怒，绿色亲和除外
 	if targetArcaneImmune then
 		if AC.Lib.IsBossTarget() and TrySwarmBeforeWrath("目标奥术免疫") then
